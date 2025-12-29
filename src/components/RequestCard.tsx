@@ -39,8 +39,13 @@ export function RequestCard({ request, onOpen }: RequestCardProps) {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                         </svg>
-                        <span className="text-xs font-black">{request.messages?.length || 0}</span>
+                        <span className="text-xs font-black">{request.total_messages || 0}</span>
                     </div>
+                    {request.unseen_count! > 0 && (
+                        <div className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-xl animate-bounce">
+                            {request.unseen_count}
+                        </div>
+                    )}
                 </div>
             </div>
 

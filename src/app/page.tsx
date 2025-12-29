@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getRequests, Request } from "@/lib/data";
 import { RequestCard } from "@/components/RequestCard";
 import { PlusIcon } from "@/components/ui/icons";
+import { useAuth } from "@/lib/auth-context";
 
 export default function ClientDashboardPage() {
   return (
@@ -16,6 +17,7 @@ export default function ClientDashboardPage() {
 }
 
 function ClientDashboardContent() {
+  const { user } = useAuth();
   const [requests, setRequests] = useState<Request[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ function ClientDashboardContent() {
   useEffect(() => {
     async function fetchRequests() {
       try {
-        const data = await getRequests();
+        const data = await getRequests(user?.id, 'client');
         setRequests(data);
       } catch (err: any) {
         setError(err.message);
@@ -35,8 +37,8 @@ function ClientDashboardContent() {
         setIsLoading(false);
       }
     }
-    fetchRequests();
-  }, []);
+    if (user?.id) fetchRequests();
+  }, [user?.id]);
 
   function filtered() {
     let arr = requests.slice();

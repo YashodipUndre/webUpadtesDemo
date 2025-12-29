@@ -29,7 +29,7 @@ function ClientRequestDetail() {
     useEffect(() => {
         async function fetchRequest() {
             try {
-                const data = await getRequestById(id);
+                const data = await getRequestById(id, user?.id, 'client');
                 setRequest(data);
             } catch (err: any) {
                 setError(err.message);
@@ -47,7 +47,7 @@ function ClientRequestDetail() {
             await sendSupabaseMessage(request.id, user.id, reply);
             setReply("");
             // Refresh request to show new message
-            const updated = await getRequestById(id);
+            const updated = await getRequestById(id, user.id);
             setRequest(updated);
         } catch (err: any) {
             alert("Error sending message: " + err.message);
@@ -90,25 +90,27 @@ function ClientRequestDetail() {
                         <h3 className="font-semibold mb-4">Conversation</h3>
                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                             {request.messages && request.messages.length > 0 ? (
-                                request.messages.map((m) => (
-                                    <div
-                                        key={m.id}
-                                        className={`p-3 rounded-lg max-w-[80%] ${m.user_id === user?.id
+                                request.messages
+                                    .filter(m => !m.is_internal)
+                                    .map((m) => (
+                                        <div
+                                            key={m.id}
+                                            className={`p-3 rounded-lg max-w-[80%] ${m.user_id === user?.id
                                                 ? "bg-blue-50 ml-auto border border-blue-100"
                                                 : "bg-gray-50 mr-auto border border-gray-100"
-                                            }`}
-                                    >
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-semibold text-gray-500">
-                                                {m.profiles?.email} ({m.profiles?.role})
-                                            </span>
+                                                }`}
+                                        >
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-xs font-semibold text-gray-500">
+                                                    {m.profiles?.email} ({m.profiles?.role})
+                                                </span>
+                                            </div>
+                                            <p className="text-gray-800">{m.text}</p>
+                                            <p className="text-[10px] text-gray-400 mt-1 text-right">
+                                                {new Date(m.created_at).toLocaleString()}
+                                            </p>
                                         </div>
-                                        <p className="text-gray-800">{m.text}</p>
-                                        <p className="text-[10px] text-gray-400 mt-1 text-right">
-                                            {new Date(m.created_at).toLocaleString()}
-                                        </p>
-                                    </div>
-                                ))
+                                    ))
                             ) : (
                                 <p className="text-gray-400 text-center py-8 italic">No messages yet.</p>
                             )}
