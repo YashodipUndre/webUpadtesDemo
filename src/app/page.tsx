@@ -27,17 +27,20 @@ function ClientDashboardContent() {
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchRequests() {
-      try {
-        const data = await getRequests(user?.id, 'client');
-        setRequests(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
+    const timer = setTimeout(() => {
+      async function fetchRequests() {
+        try {
+          const data = await getRequests(user?.id, 'client');
+          setRequests(data);
+        } catch (err: any) {
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    }
-    if (user?.id) fetchRequests();
+      if (user?.id) fetchRequests();
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [user?.id]);
 
   function filtered() {

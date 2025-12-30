@@ -17,17 +17,20 @@ function AdminReports() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        async function fetchData() {
-            try {
-                const data = await getRequests();
-                setRequests(data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsLoading(false);
+        const timer = setTimeout(() => {
+            async function fetchData() {
+                try {
+                    const data = await getRequests();
+                    setRequests(data);
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    setIsLoading(false);
+                }
             }
-        }
-        fetchData();
+            fetchData();
+        }, 2000);
+        return () => clearTimeout(timer);
     }, []);
 
     if (isLoading) {

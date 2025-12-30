@@ -31,21 +31,24 @@ function AdminDashboard() {
     });
 
     useEffect(() => {
-        async function fetchData() {
-            try {
-                const [reqData, revData] = await Promise.all([
-                    getRequests(user?.id, 'admin'),
-                    getReviewers()
-                ]);
-                setRequests(reqData);
-                setReviewers(revData);
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
+        const timer = setTimeout(() => {
+            async function fetchData() {
+                try {
+                    const [reqData, revData] = await Promise.all([
+                        getRequests(user?.id, 'admin'),
+                        getReviewers()
+                    ]);
+                    setRequests(reqData);
+                    setReviewers(revData);
+                } catch (err: any) {
+                    setError(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
             }
-        }
-        if (user?.id) fetchData();
+            if (user?.id) fetchData();
+        }, 2000);
+        return () => clearTimeout(timer);
     }, [user?.id]);
 
     async function refreshData() {

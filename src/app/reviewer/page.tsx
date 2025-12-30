@@ -22,17 +22,20 @@ function ReviewerDashboard() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        async function fetchRequests() {
-            try {
-                const data = await getRequests(user?.id, 'reviewer');
-                setRequests(data);
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
+        const timer = setTimeout(() => {
+            async function fetchRequests() {
+                try {
+                    const data = await getRequests(user?.id, 'reviewer');
+                    setRequests(data);
+                } catch (err: any) {
+                    setError(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
             }
-        }
-        if (user?.id) fetchRequests();
+            if (user?.id) fetchRequests();
+        }, 2000);
+        return () => clearTimeout(timer);
     }, [user?.id]);
 
     // Filter by assigned reviewer

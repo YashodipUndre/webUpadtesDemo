@@ -29,18 +29,21 @@ function AdminRequestDetail() {
     const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
-        async function fetchRequest() {
-            try {
-                const data = await getRequestById(id, user?.id, 'admin');
-                setRequest(data);
-                setStatus(data.status);
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
+        const timer = setTimeout(() => {
+            async function fetchRequest() {
+                try {
+                    const data = await getRequestById(id, user?.id, 'admin');
+                    setRequest(data);
+                    setStatus(data.status);
+                } catch (err: any) {
+                    setError(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
             }
-        }
-        if (id) fetchRequest();
+            if (id) fetchRequest();
+        }, 2000);
+        return () => clearTimeout(timer);
     }, [id]);
 
     async function handleStatusChange(newStatus: string) {

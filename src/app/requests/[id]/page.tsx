@@ -27,17 +27,20 @@ function ClientRequestDetail() {
     const [isSending, setIsSending] = useState(false);
 
     useEffect(() => {
-        async function fetchRequest() {
-            try {
-                const data = await getRequestById(id, user?.id, 'client');
-                setRequest(data);
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
+        const timer = setTimeout(() => {
+            async function fetchRequest() {
+                try {
+                    const data = await getRequestById(id, user?.id, 'client');
+                    setRequest(data);
+                } catch (err: any) {
+                    setError(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
             }
-        }
-        if (id) fetchRequest();
+            if (id) fetchRequest();
+        }, 2000);
+        return () => clearTimeout(timer);
     }, [id]);
 
     async function sendReply() {

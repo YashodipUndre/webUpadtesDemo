@@ -14,9 +14,12 @@ export function ProtectedRoute({ children, allow }: ProtectedRouteProps) {
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading && !role) {
-            router.push("/login");
-        }
+        const timer = setTimeout(() => {
+            if (!isLoading && !role) {
+                router.push("/login");
+            }
+        }, 2000);
+        return () => clearTimeout(timer);
     }, [role, isLoading, router]);
 
     if (isLoading) {
