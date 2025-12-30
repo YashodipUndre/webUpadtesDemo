@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session?.user) {
                 fetchUserRole(session.user.id).finally(() => setIsLoading(false));
             } else {
+                logout();
                 setIsLoading(false);
             }
         });
@@ -77,8 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const logout = async () => {
-        await supabase.auth.signOut();
         router.push("/login");
+        await supabase.auth.signOut();
+        console.log("User logged out");
+        
     };
 
     return (
