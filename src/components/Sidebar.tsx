@@ -1,103 +1,80 @@
 "use client";
 
-import React from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { MenuIcon } from "@/components/ui/icons";
+import { LogOut, Settings, User, Mail, Menu, X } from "lucide-react";
 
-interface SidebarProps {
-    open: boolean;
-    setOpen: (open: boolean) => void;
-}
-
-export function Sidebar({ open, setOpen }: SidebarProps) {
+export function Sidebar() {
     const { user, role, logout } = useAuth();
+    const [isOpen, setIsOpen] = useState(false);
+
+    if (!user) return null;
 
     return (
-        <div className="relative z-50">
-            {open && (
-                <motion.aside
-                    initial={{ x: -40, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    className="w-72 bg-white shadow-xl p-6 space-y-6 h-screen fixed left-0 top-0 z-20 overflow-y-auto"
-                >
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <MenuIcon />
-                            <h2 className="text-xl font-bold">Web Updates</h2>
+        <>
+            {/* Mobile Toggle Button */}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="lg:hidden fixed bottom-6 right-6 z-[60] w-12 h-12 bg-yellow-400 text-stone-900 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all"
+            >
+                {isOpen ? <X /> : <Menu />}
+            </button>
+
+            <aside className={`
+                fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out 
+                lg:static lg:translate-x-0 lg:flex flex-col lg:h-[calc(100vh-64px)] lg:sticky lg:top-16 overflow-y-auto -mt-px
+                ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                {/* User Profile Section */}
+                <div className="pt-4 pb-6 px-6 border-b border-slate-100 bg-white">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center text-slate-400 group relative">
+                            <User className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
                         </div>
-                        <button
-                            onClick={() => setOpen(false)}
-                            className="text-sm px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 md:hidden"
-                        >
-                            Close
-                        </button>
+                        <div className="text-center">
+                            <p className="text-xs font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">{role || "No Role"}</p>
+                            <p className="text-sm font-bold text-slate-900 truncate max-w-[180px]" title={user.email}>
+                                {user.email?.split('@')[0]}
+                            </p>
+                        </div>
                     </div>
+                </div>
 
-                    {user && (
-                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                            <div className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">
-                                {role || "User"}
-                            </div>
-                            <div className="text-sm text-gray-700 truncate font-medium">
-                                {user.email}
-                            </div>
-                        </div>
-                    )}
-
-                    <nav className="space-y-2 text-sm">
-                        {role === "client" && <NavLink href="/">Client Dashboard</NavLink>}
-                        {role === "client" && <NavLink href="/requests/new">Create Request</NavLink>}
-
-                        {role === "admin" && <NavLink href="/admin">Admin Dashboard</NavLink>}
-                        {role === "admin" && <NavLink href="/admin/reports">Reports</NavLink>}
-
-                        {role === "reviewer" && (
-                            <NavLink href="/reviewer">Reviewer Dashboard</NavLink>
-                        )}
-
-                        {!user && (
-                            <div className="space-y-2">
-                                <NavLink href="/login">Login</NavLink>
-                                <NavLink href="/signup">Sign Up</NavLink>
-                            </div>
-                        )}
-                    </nav>
-
-                    {user && (
-                        <div className="pt-4 border-t">
-                            <button
-                                onClick={logout}
-                                className="w-full text-left text-sm text-red-600 font-medium hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition"
-                            >
-                                Sign Out
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="mt-6">
-                        <p className="text-[10px] text-gray-400">© 2025 Web Updates Management</p>
+                {/* Main Navigation */}
+                <div className="flex-1 p-4 py-8 space-y-1 overflow-y-auto">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mb-2">Account Details</div>
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-slate-600 mb-4">
+                        <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <span className="text-xs font-bold truncate">{user.email}</span>
                     </div>
-                </motion.aside>
-            )}
+                </div>
 
-            {!open && (
-                <button
-                    onClick={() => setOpen(true)}
-                    className="fixed left-2 top-2 z-30 bg-white shadow p-2 rounded-md hover:bg-gray-50 border border-gray-100"
-                >
-                    <MenuIcon />
-                </button>
-            )}
-        </div>
-    );
-}
+                {/* Action Buttons */}
+                <div className="p-4 border-t border-slate-100 space-y-2">
+                    <button
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-all group"
+                    >
+                        <Settings className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+                        <span>Settings</span>
+                    </button>
+                    <button
+                        onClick={logout}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all group active:scale-95"
+                    >
+                        <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                        <span>Sign Out</span>
+                    </button>
+                </div>
+            </aside>
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-    return (
-        <Link href={href} className="block p-3 hover:bg-blue-50 text-gray-700 hover:text-blue-700 rounded-md transition-all font-medium">
-            {children}
-        </Link>
+            {/* Backdrop for mobile */}
+            {isOpen && (
+                <div
+                    onClick={() => setIsOpen(false)}
+                    className="lg:hidden fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 animate-in fade-in"
+                />
+            )}
+        </>
     );
 }

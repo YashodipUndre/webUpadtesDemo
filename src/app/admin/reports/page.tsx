@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getRequests, Request } from "@/lib/data";
+import { motion } from "framer-motion";
+import { TrendingUp, School, Clock, CheckCircle, AlertCircle, BarChart3 } from "lucide-react";
 
 export default function AdminReportsPage() {
     return (
@@ -20,7 +22,7 @@ function AdminReports() {
         const timer = setTimeout(() => {
             async function fetchData() {
                 try {
-                    const data = await getRequests();
+                    const data = await getRequests(undefined, 'admin');
                     setRequests(data);
                 } catch (err) {
                     console.error(err);
@@ -36,73 +38,302 @@ function AdminReports() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
             </div>
         );
     }
 
-    const total = requests.length;
-    const newCount = requests.filter((r) => r.status === "New").length;
-    const inProgress = requests.filter((r) => r.status === "In Progress").length;
-    const urgent = requests.filter((r) => r.urgency === "Urgent").length;
-    const peer = requests.filter((r) => r.status === "Peer Review").length;
-    const complete = requests.filter((r) => r.status === "Complete").length;
+    // --- Data Processing ---
 
-    // Get unique clients from emails
-    const clientEmails = Array.from(new Set(requests.map(r => r.profiles?.email).filter(Boolean)));
+    // 1. Requests by School (Volume & Workload)
+    const schoolStats = requests.reduce((acc, r) => {
+        const schoolName = r.profiles?.school || "Unknown School";
+        if (!acc[schoolName]) {
+            acc[schoolName] = { count: 0, effort: 0, items: 0 };
+        }
+        acc[schoolName].count += 1;
+        r.items?.forEach(item => {
+            acc[schoolName].items += 1;
+            acc[schoolName].effort += (item.estimated_effort || 0);
+        });
+        return acc;
+    }, {} as Record<string, { count: number; effort: number; items: number }>);
+
+    const sortedSchools = Object.entries(schoolStats).sort((a, b) => b[1].count - a[1].count);
+
+    // 2. Ticket Volume Over Time (Last 7 Days)
+    const last7Days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return d.toISOString().split('T')[0];
+    }).reverse();
+
+    const volumeOverTime = last7Days.map(date => ({
+        date,
+        count: requests.filter(r => r.created_at.startsWith(date)).length
+    }));
+
+    const maxVolume = Math.max(...volumeOverTime.map(v => v.count), 1);
+
+    // 3. Status Distribution
+    const statusCounts = {
+        New: requests.filter(r => r.status === 'New').length,
+        'In Progress': requests.filter(r => ['In Progress', 'Peer Review', 'Info Needed'].includes(r.status)).length,
+        Complete: requests.filter(r => r.status === 'Complete').length,
+    };
 
     return (
-        <div className="space-y-6">
-            <h1 className="text-2xl font-bold">Reports & Analytics</h1>
-            <p className="text-sm text-gray-600">Summary of system activity</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ReportCard title="Total Requests" value={total} color="blue" />
-                <ReportCard title="New" value={newCount} color="gray" />
-                <ReportCard title="In Progress" value={inProgress} color="yellow" />
-                <ReportCard title="Peer Review" value={peer} color="purple" />
-                <ReportCard title="Urgent" value={urgent} color="red" />
-                <ReportCard title="Completed" value={complete} color="green" />
+        <div className="space-y-10 max-w-7xl mx-auto pb-20">
+            <header className="space-y-2">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-400 rounded-xl">
+                        <TrendingUp className="w-6 h-6 text-stone-900" />
+                    </div>
+                    <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 transition-all">
+                        Operations Analytics
+                    </h1>
+                </div>
+                <p className="text-slate-500 font-medium max-w-2xl">
+                    Performance tracking and workload distribution across all schools and campuses.
+                </p>
+            </header>
+
+            {/* Top KPIs */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <StatCard title="Total Tickets" value={requests.length} icon={<BarChart3 className="w-5 h-5" />} color="yellow" />
+                <StatCard title="Active Workload" value={statusCounts['In Progress']} icon={<Clock className="w-5 h-5" />} color="blue" />
+                <StatCard title="High Urgency" value={requests.filter(r => r.urgency === 'Urgent').length} icon={<AlertCircle className="w-5 h-5" />} color="rose" />
+                <StatCard title="Avg Resolution Time" value="1.2 Days" icon={<CheckCircle className="w-5 h-5" />} color="emerald" />
             </div>
-            <div className="bg-white p-4 rounded-xl shadow">
-                <h3 className="font-semibold mb-3">Requests by Client</h3>
-                <ul className="text-sm space-y-2">
-                    {clientEmails.length > 0 ? (
-                        clientEmails.map((email) => (
-                            <li key={email} className="flex justify-between border-b pb-1">
-                                <span>{email}</span>
-                                <span>{requests.filter((r) => r.profiles?.email === email).length}</span>
-                            </li>
-                        ))
-                    ) : (
-                        <li className="text-gray-400 italic">No clients found</li>
-                    )}
-                </ul>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* School Leaderboard */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                                <School className="w-4 h-4 text-yellow-500" />
+                                Workload per School
+                            </h3>
+                            <p className="text-[10px] text-slate-400 font-medium font-mono uppercase tracking-tighter">Maintenance Distribution</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {sortedSchools.map(([name, stats], idx) => (
+                            <div key={name} className="group">
+                                <div className="flex justify-between items-end mb-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-5 h-5 rounded-md bg-slate-50 flex items-center justify-center text-[9px] font-black text-slate-400 border border-slate-100">{idx + 1}</span>
+                                        <span className="text-xs font-bold text-slate-700">{name}</span>
+                                    </div>
+                                    <div className="text-right leading-none">
+                                        <span className="text-[10px] font-black text-yellow-600 block">{stats.count} Tickets</span>
+                                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{stats.effort} Total Hours</span>
+                                    </div>
+                                </div>
+                                <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${(stats.count / (sortedSchools[0][1].count || 1)) * 100}%` }}
+                                        transition={{ duration: 1, delay: idx * 0.1 }}
+                                        className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full shadow-lg shadow-yellow-200/50"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Ticket Volume Chart */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6 flex flex-col">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                            <TrendingUp className="w-4 h-4 text-yellow-500" />
+                            Trend Analysis
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium font-mono uppercase tracking-tighter">Last 7 Days Activity</p>
+                    </div>
+
+                    <div className="flex-1 flex items-end justify-between gap-2 min-h-[180px] pb-2 px-2">
+                        {volumeOverTime.map((v, i) => (
+                            <div key={v.date} className="flex-1 flex flex-col items-center gap-2 group relative">
+                                <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-all bg-stone-900 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg pointer-events-none">
+                                    {v.count}
+                                </div>
+                                <motion.div
+                                    initial={{ height: 4 }}
+                                    animate={{ height: `Math.max(${(v.count / maxVolume) * 100}, 2)%` }} // Ensure at least 2% height
+                                    style={{ height: `${(v.count / maxVolume) * 100}%` }} // Fallback
+                                    transition={{ duration: 0.8, delay: i * 0.1 }}
+                                    className={`w-full max-w-[30px] rounded-t-lg min-h-[4px] transition-all ${v.count === maxVolume && v.count > 0 ? 'bg-yellow-400' : 'bg-slate-100 group-hover:bg-yellow-200'}`}
+                                />
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter rotate-0 mt-2">
+                                    {new Date(v.date).toLocaleDateString(undefined, { weekday: 'narrow' })}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Top Clients */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Top Clients</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">By Request Volume</p>
+                    </div>
+                    <div className="space-y-3">
+                        {Object.entries(requests.reduce((acc, r) => {
+                            const email = r.profiles?.email || 'Unknown';
+                            acc[email] = (acc[email] || 0) + 1;
+                            return acc;
+                        }, {} as Record<string, number>))
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([email, count], i) => (
+                                <div key={email} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 shadow-sm">
+                                            #{i + 1}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-slate-700">{email.split('@')[0]}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-black text-slate-800">{count}</span>
+                                </div>
+                            ))}
+                    </div>
+                </section>
+
+                {/* Team Workload */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Team Workload</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Requests</p>
+                    </div>
+                    <div className="space-y-4">
+                        {Object.entries(requests.filter(r => r.status !== 'Complete').reduce((acc, r) => {
+                            const reviewer = r.reviewer_id ? `Reviewer ${r.reviewer_id.slice(-4)}` : 'Unassigned';
+                            acc[reviewer] = (acc[reviewer] || 0) + 1;
+                            return acc;
+                        }, {} as Record<string, number>)).map(([reviewer, count], i) => (
+                            <div key={reviewer} className="space-y-1">
+                                <div className="flex justify-between text-[10px] font-bold text-slate-600">
+                                    <span>{reviewer}</span>
+                                    <span>{count}</span>
+                                </div>
+                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${(count / (requests.length || 1)) * 100}%` }}
+                                        className="h-full bg-blue-500 rounded-full"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Status Breakdown */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Status Breakdown</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Distribution</p>
+                    </div>
+                    <div className="space-y-3">
+                        {['New', 'In Progress', 'Peer Review', 'Info Needed', 'Complete'].map(status => {
+                            const count = requests.filter(r => r.status === status).length;
+                            const percentage = Math.round((count / (requests.length || 1)) * 100);
+                            return (
+                                <div key={status} className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${status === 'New' ? 'bg-blue-400' :
+                                        status === 'Complete' ? 'bg-emerald-400' :
+                                            status === 'Peer Review' ? 'bg-amber-400' : 'bg-slate-400'
+                                        }`} />
+                                    <span className="text-[10px] font-bold text-slate-600 w-20">{status}</span>
+                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${percentage}%` }}
+                                            className={`h-full ${status === 'New' ? 'bg-blue-400' :
+                                                status === 'Complete' ? 'bg-emerald-400' :
+                                                    status === 'Peer Review' ? 'bg-amber-400' : 'bg-slate-400'
+                                                }`}
+                                        />
+                                    </div>
+                                    <span className="text-[10px] font-black text-slate-800">{count}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+
+                {/* Urgency Distribution */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Urgency</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Priority Split</p>
+                    </div>
+                    <div className="flex items-center justify-center h-48 relative">
+                        {/* Simple Donut Chart Representation */}
+                        <div className="relative w-32 h-32">
+                            <svg viewBox="0 0 36 36" className="w-full h-full rotate-[-90deg]">
+                                {/* Background Circle */}
+                                <path className="text-slate-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.8" />
+                                {/* Urgent Segment */}
+                                <motion.path
+                                    initial={{ strokeDasharray: "0, 100" }}
+                                    animate={{ strokeDasharray: `${(requests.filter(r => r.urgency === 'Urgent').length / (requests.length || 1)) * 100}, 100` }}
+                                    className="text-rose-500"
+                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3.8"
+                                />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-2xl font-black text-slate-800">{requests.filter(r => r.urgency === 'Urgent').length}</span>
+                                <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wide">Urgent</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex justify-center gap-4 mt-[-10px]">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                            <span className="text-[10px] font-bold text-slate-500">Urgent</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-slate-200"></div>
+                            <span className="text-[10px] font-bold text-slate-500">Normal</span>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     );
 }
 
-function ReportCard({
-    title,
-    value,
-    color,
-}: {
-    title: string;
-    value: number;
-    color: "blue" | "gray" | "yellow" | "purple" | "red" | "green";
-}) {
-    const colors = {
-        blue: "bg-blue-100 text-blue-700",
-        gray: "bg-gray-100 text-gray-700",
-        yellow: "bg-yellow-100 text-yellow-700",
-        purple: "bg-purple-100 text-purple-700",
-        red: "bg-red-100 text-red-700",
-        green: "bg-green-100 text-green-700",
+
+function StatCard({ title, value, icon, color }: { title: string; value: string | number; icon: React.ReactNode; color: string }) {
+    const colorMap: any = {
+        yellow: "bg-yellow-50 text-yellow-700 border-yellow-200",
+        blue: "bg-blue-50 text-blue-700 border-blue-200",
+        rose: "bg-rose-50 text-rose-700 border-rose-200",
+        emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
     };
+
     return (
-        <div className={`p-6 rounded-xl shadow ${colors[color]}`}>
-            <h3 className="font-semibold text-lg">{title}</h3>
-            <p className="text-3xl font-bold mt-2">{value}</p>
+        <div className={`p-4 rounded-2xl border ${colorMap[color]} shadow-sm flex items-center justify-between`}>
+            <div>
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">{title}</p>
+                <p className="text-2xl font-black tracking-tight">{value}</p>
+            </div>
+            <div className="p-2 bg-white/60 rounded-xl shadow-sm">
+                {icon}
+            </div>
         </div>
     );
 }

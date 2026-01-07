@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getRequests, Request } from "@/lib/data";
 import { useAuth } from "@/lib/auth-context";
-import { StatusBadge } from "@/components/StatusBadge";
+import { RequestCard } from "@/components/RequestCard";
+import { Search, Filter, X } from "lucide-react";
 
 export default function ReviewerDashboardPage() {
     return (
@@ -17,6 +19,7 @@ export default function ReviewerDashboardPage() {
 
 function ReviewerDashboard() {
     const { user } = useAuth();
+    const router = useRouter();
     const [requests, setRequests] = useState<Request[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -38,113 +41,153 @@ function ReviewerDashboard() {
         return () => clearTimeout(timer);
     }, [user?.id]);
 
-    // Filter by assigned reviewer
-    const assigned = requests.filter((r) => r.reviewer_id === user?.id);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterStatus, setFilterStatus] = useState("All");
+
+    // Filter by whether any item has this user as a peer reviewer OR Peer Review status
+    const filtered = requests.filter((r) => {
+        const isPeerReviewer = r.items?.some(item => item.peer_reviewers?.some(pr => pr.user_id === user?.id));
+        const isEligible = isPeerReviewer || r.status === 'Peer Review';
+
+        if (!isEligible) return false;
+
+        const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.id.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = filterStatus === "All" || r.status === filterStatus;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
+
+    // Reset page when filtering
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, filterStatus]);
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-600 border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-10 max-w-6xl mx-auto py-8 px-4">
-            <header className="space-y-3">
-                <div className="flex items-center gap-3 mb-2">
-                    <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100 italic">
+        <div className="space-y-6 py-4">
+            <header className="space-y-2">
+                <div className="flex items-center gap-2 mb-1.5">
+                    <span className="px-2.5 py-0.5 bg-yellow-50 text-yellow-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-yellow-100 italic">
                         Secured Review Board
                     </span>
                 </div>
-                <h1 className="text-4xl font-black tracking-tight text-slate-900">Personal Review Queue</h1>
-                <p className="text-slate-500 font-medium max-w-2xl">
+                <h1 className="text-3xl font-black tracking-tight text-slate-900">Personal Review Queue</h1>
+                <p className="text-slate-500 font-medium max-w-2xl text-sm">
                     Evaluation board for requests exclusively assigned to your profile for technical validation and quality assurance.
                 </p>
             </header>
 
             {error && (
-                <div className="bg-red-50 border border-red-100 text-red-600 p-5 rounded-2xl text-sm font-bold animate-in fade-in">
+                <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-xs font-bold animate-in fade-in">
                     System Error: {error}
                 </div>
             )}
 
-            <div className="card-premium p-10 bg-white rounded-[2.5rem] border-slate-200 shadow-2xl shadow-indigo-100/20">
-                <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                        <div className="w-1.5 h-8 bg-gradient-to-b from-indigo-600 to-violet-600 rounded-full" />
-                        My Assignments
-                        <span className="ml-2 px-3 py-1 bg-indigo-600 text-white rounded-full text-xs font-black">
-                            {assigned.length}
+            <div className="card-premium p-6 bg-white rounded-[2.5rem] border-slate-200 shadow-xl shadow-yellow-100/20">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <div className="w-1.5 h-6 bg-gradient-to-b from-yellow-500 to-amber-600 rounded-full" />
+                        Review Queue
+                        <span className="ml-1 px-2.5 py-1 bg-yellow-400 text-stone-900 rounded-full text-[11px] font-black">
+                            {filtered.length}
                         </span>
                     </h3>
+
+                    <div className="flex flex-col sm:flex-row gap-3 flex-1 max-w-2xl justify-end">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search by ID or Title..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none group-hover:border-slate-300"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full transition-colors"
+                                >
+                                    <X className="w-3 h-3 text-slate-500" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                            {['All', 'Peer Review', 'In Progress', 'Complete'].map((status) => (
+                                <button
+                                    key={status}
+                                    onClick={() => setFilterStatus(status)}
+                                    className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${filterStatus === status
+                                            ? "bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-200"
+                                            : "bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600"
+                                        }`}
+                                >
+                                    {status}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
-                {assigned.length === 0 ? (
-                    <div className="py-24 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
-                        <div className="w-20 h-20 bg-white shadow-xl shadow-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-6 transform -rotate-6">
-                            <svg className="w-10 h-10 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                {filtered.length === 0 ? (
+                    <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
+                        <div className="w-20 h-20 bg-white shadow-xl shadow-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-5 transform -rotate-6">
+                            <Search className="w-10 h-10 text-yellow-500" />
                         </div>
-                        <h4 className="text-slate-900 font-bold text-lg mb-1">Board Clear</h4>
-                        <p className="text-slate-400 font-medium">No pending validations assigned to your station.</p>
+                        <h4 className="text-slate-900 font-bold text-base mb-1">No Results Found</h4>
+                        <p className="text-slate-400 font-medium text-sm">Try adjusting your filters or search query.</p>
+                        {(searchQuery || filterStatus !== "All") && (
+                            <button
+                                onClick={() => { setSearchQuery(""); setFilterStatus("All"); }}
+                                className="mt-4 px-6 py-2 bg-yellow-400 text-stone-900 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-yellow-500 transition-colors shadow-lg shadow-yellow-200"
+                            >
+                                Reset All Filters
+                            </button>
+                        )}
                     </div>
                 ) : (
-                    <div className="grid gap-6">
-                        {assigned.map((r) => (
-                            <div
+                    <div className="flex flex-col gap-2">
+                        {filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((r) => (
+                            <RequestCard
                                 key={r.id}
-                                className="group p-7 border border-slate-100 rounded-[2rem] flex flex-col md:flex-row justify-between items-start md:items-center bg-white hover:bg-slate-50/50 hover:border-indigo-100 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
-                            >
-                                <div className="space-y-4">
-                                    <div className="flex flex-wrap items-center gap-4">
-                                        <p className="font-extrabold text-slate-900 text-xl group-hover:text-indigo-600 transition-colors tracking-tight">
-                                            {r.title}
-                                        </p>
-                                        <div className="flex items-center gap-2">
-                                            <StatusBadge status={r.status} />
-                                            {r.urgency === 'Urgent' && (
-                                                <span className="text-[10px] bg-rose-500 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest shadow-lg shadow-rose-200">
-                                                    CRITICAL
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-400">
-                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-tight">
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                            </svg>
-                                            {r.total_messages || 0} MSGS
-                                        </div>
-                                        <span className="text-slate-200">/</span>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-slate-300">AUTHOR:</span>
-                                            <span className="text-slate-600">{r.profiles?.email}</span>
-                                        </div>
-                                        <span className="text-slate-200">/</span>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-slate-300">LOGGED:</span>
-                                            <span className="text-slate-600 uppercase">
-                                                {new Date(r.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
-                                            </span>
-                                        </div>
-                                        {r.unseen_count! > 0 && (
-                                            <span className="text-indigo-600 font-black animate-bounce text-[10px] tracking-widest bg-indigo-50 px-2 py-1 rounded-md">
-                                                {r.unseen_count} NEW
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <Link
-                                    href={`/reviewer/requests/${r.id}`}
-                                    className="mt-6 md:mt-0 px-8 py-4 text-[11px] font-black text-white bg-indigo-600 rounded-2xl hover:bg-slate-900 hover:scale-105 transition-all shadow-xl shadow-indigo-100 active:scale-95 uppercase tracking-widest"
-                                >
-                                    Validate Request
-                                </Link>
-                            </div>
+                                request={r}
+                                onOpen={() => router.push(`/reviewer/requests/${r.id}`)}
+                            />
                         ))}
+                        {/* Pagination Controls */}
+                        {filtered.length > ITEMS_PER_PAGE && (
+                            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100 mt-4 rounded-xl">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                    className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                                >
+                                    Previous
+                                </button>
+                                <span className="text-xs font-bold text-slate-400">
+                                    Page {page} of {Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                </span>
+                                <button
+                                    onClick={() => setPage(p => Math.min(Math.ceil(filtered.length / ITEMS_PER_PAGE), p + 1))}
+                                    disabled={page >= Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                    className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
