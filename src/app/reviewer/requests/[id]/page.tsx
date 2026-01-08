@@ -3,17 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { getRequestById, updateRequestStatus, sendMessage, Request, updateItemStatus, Attachment, submitPeerReviewDecision } from "@/lib/data";
+import { getRequestById, updateRequestStatus, sendMessage, Request, updateItemStatus, Attachment, submitPeerReviewDecision, ITEM_STATUSES, RESPONSE_TEMPLATES, updateItemEffortAndDate, getReviewers, assignItem, fileToBase64 } from "@/lib/data";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TicketItemCard } from "@/components/TicketItemCard";
 import { useAuth } from "@/lib/auth-context";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
-import { Search } from "lucide-react";
+import { Search, ChevronDown, User, Calendar, Clock, Link as LinkIcon, FileText, Image as ImageIcon, MessageCircle, ShieldCheck } from "lucide-react";
 
 export default function ReviewerRequestDetailPage() {
     return (
-        <ProtectedRoute allow={["reviewer"]}>
+        <ProtectedRoute allow={["reviewer", "developer"]}>
             <ReviewerRequestDetail />
         </ProtectedRoute>
     );
@@ -23,10 +23,11 @@ function ReviewerRequestDetail() {
     const params = useParams();
     const router = useRouter();
     const id = params?.id as string;
-    const { user } = useAuth();
+    const { user, role } = useAuth();
     const [request, setRequest] = useState<Request | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [reviewers, setReviewers] = useState<{ id: string, email: string }[]>([]);
 
     const [activeTab, setActiveTab] = useState<'client' | 'internal'>('internal');
     const [clientMessage, setClientMessage] = useState("");
@@ -42,8 +43,10 @@ function ReviewerRequestDetail() {
         const timer = setTimeout(() => {
             async function fetchRequest() {
                 try {
-                    const data = await getRequestById(id, user?.id, 'reviewer');
+                    const data = await getRequestById(id, user?.id, role || 'reviewer');
                     setRequest(data);
+                    const revs = await getReviewers();
+                    setReviewers(revs);
                 } catch (err: any) {
                     setError(err.message);
                 } finally {
@@ -92,24 +95,55 @@ function ReviewerRequestDetail() {
         }
     }
 
-    async function confirmComplete() {
+    async function confirmComplete(isUrgent: boolean = false) {
         if (!request || !user) return;
         setIsUpdating(true);
         try {
             const newStatus = "Complete";
             await updateRequestStatus(request.id, newStatus, user.email || 'Reviewer');
-            await sendMessage(request.id, user.id, `Reviewer marked ticket as COMPLETED.`, false, undefined, 'reviewer', user.email || 'Reviewer');
-            const updated = await getRequestById(id, user.id, 'reviewer');
+            const message = isUrgent
+                ? "Developer marked ticket as COMPLETED (URGENT - Peer review to follow)."
+                : "Developer marked ticket as COMPLETED.";
+            await sendMessage(request.id, user.id, message, false, undefined, 'reviewer', user.email || 'Reviewer');
+            const updated = await getRequestById(id, user.id, role || 'reviewer');
             setRequest(updated);
             setShowCompleteConfirm(false);
             alert("Ticket marked as Complete");
-            router.push("/reviewer");
+            router.push(role === 'developer' ? "/developer" : "/reviewer");
         } catch (err: any) {
             alert("Error: " + err.message);
         } finally {
             setIsUpdating(false);
         }
     }
+
+    const handleItemReassignment = async (itemId: string, reviewerId: string | null) => {
+        if (!request || !user) return;
+        setIsUpdating(true);
+        try {
+            await assignItem(request.id, itemId, reviewerId, user.email || 'Developer');
+            const updated = await getRequestById(id, user.id, role || 'reviewer');
+            setRequest(updated);
+        } catch (err: any) {
+            alert("Error: " + err.message);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleItemEffortDate = async (itemId: string, effort: number, dueDate: string | null) => {
+        if (!request || !user) return;
+        setIsUpdating(true);
+        try {
+            await updateItemEffortAndDate(request.id, itemId, effort, dueDate, user.email || 'Developer');
+            const updated = await getRequestById(id, user.id, role || 'reviewer');
+            setRequest(updated);
+        } catch (err: any) {
+            alert("Error: " + err.message);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     async function sendMessageToClient() {
         if ((!clientMessage.trim() && !clientAttachment) || !user || !request) return;
@@ -213,13 +247,20 @@ function ReviewerRequestDetail() {
                                 return (
                                     <div
                                         key={m.id}
-                                        className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}
+                                        className={`flex w-full gap-3 ${isMe ? "justify-end" : "justify-start"}`}
                                     >
+                                        {!isMe && (
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 shadow-sm mt-1">
+                                                {m.profiles?.email?.substring(0, 2).toUpperCase() || "??"}
+                                            </div>
+                                        )}
+
                                         <div className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
                                             <div className="flex items-center gap-2 mb-1 px-1">
                                                 {!isMe && (
-                                                    <span className="text-[10px] font-bold text-yellow-600">
+                                                    <span className="text-[10px] font-bold text-slate-600">
                                                         {m.profiles?.email.split('@')[0]}
+                                                        <span className="text-slate-400 font-normal ml-1 capitalize">({m.profiles?.role || 'Unknown'})</span>
                                                     </span>
                                                 )}
                                                 {isInternal && (
@@ -266,10 +307,19 @@ function ReviewerRequestDetail() {
                                                 )}
                                             </div>
 
-                                            <span className="text-[9px] text-yellow-600 mt-1 px-1 select-none">
+                                            <span className="text-[9px] text-slate-400 mt-1 px-1 select-none">
+                                                {isMe && <span className="font-bold mr-1">Me</span>}
+                                                {/* Actually 'Me' is handled by avatar/bubble position mostly */}
+                                                {/* Revert explicit 'Me' text to avoid clutter if we have avatar */}
                                                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
+
+                                        {isMe && (
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center text-[10px] font-black text-yellow-700 shadow-sm mt-1">
+                                                ME
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -297,7 +347,20 @@ function ReviewerRequestDetail() {
                             </div>
 
                             {activeTab === 'client' ? (
-                                <div className="space-y-3">
+                                <div className="space-y-4">
+                                    <div className="flex justify-start px-1">
+                                        <select
+                                            onChange={(e) => {
+                                                const template = RESPONSE_TEMPLATES.find(t => t.label === e.target.value);
+                                                if (template) setClientMessage(prev => prev + (prev ? "\n\n" : "") + template.text);
+                                                e.target.value = "";
+                                            }}
+                                            className="text-[10px] font-bold uppercase py-1 px-3 bg-slate-100 border-none rounded-lg text-slate-500 hover:bg-slate-200 transition-all cursor-pointer outline-none"
+                                        >
+                                            <option value="">Insert Template...</option>
+                                            {RESPONSE_TEMPLATES.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
+                                        </select>
+                                    </div>
                                     {clientAttachment && (
                                         <div className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-100 rounded-lg mx-1 shadow-sm animate-in fade-in slide-in-from-bottom-2">
                                             <div className="flex items-center gap-2">
@@ -311,7 +374,11 @@ function ReviewerRequestDetail() {
                                             </button>
                                         </div>
                                     )}
-                                    <div className="bg-white rounded-xl shadow-sm transition-all overflow-hidden">
+                                    <div className="bg-white rounded-xl shadow-sm transition-all overflow-hidden border border-slate-200">
+                                        <div className="bg-yellow-50/50 px-4 py-2 border-b border-yellow-100 flex items-center gap-2 text-[10px] font-bold text-yellow-700 uppercase tracking-wide">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                            Warning: This message will be visible to the client
+                                        </div>
                                         <RichTextEditor
                                             value={clientMessage}
                                             onChange={setClientMessage}
@@ -319,13 +386,13 @@ function ReviewerRequestDetail() {
                                             className="min-h-[80px]"
                                             leadingActions={
                                                 <label className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer transition-all" title="Attach">
-                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) setClientAttachment({ name: file.name, url: URL.createObjectURL(file), type: file.type }); }} />
+                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { const url = await fileToBase64(file); setClientAttachment({ name: file.name, url, type: file.type }); } }} />
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                                 </label>
                                             }
                                             trailingActions={
                                                 <button
-                                                    onClick={() => setShowConfirm(true)}
+                                                    onClick={sendMessageToClient}
                                                     disabled={isUpdating || (!clientMessage.trim() && !clientAttachment)}
                                                     className="px-4 py-2 bg-yellow-400 text-stone-900 text-xs font-black uppercase tracking-wider rounded-lg hover:bg-yellow-500 disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 transition-all shadow-sm active:scale-95 flex items-center gap-2"
                                                 >
@@ -363,7 +430,7 @@ function ReviewerRequestDetail() {
                                             className="min-h-[80px]"
                                             leadingActions={
                                                 <label className="p-2 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-lg cursor-pointer transition-all" title="Attach to Internal">
-                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) setInternalAttachment({ name: file.name, url: URL.createObjectURL(file), type: file.type }); }} />
+                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { const url = await fileToBase64(file); setInternalAttachment({ name: file.name, url, type: file.type }); } }} />
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                                 </label>
                                             }
@@ -390,29 +457,64 @@ function ReviewerRequestDetail() {
                 </main>
 
                 <aside className="space-y-4">
-                    <div className="bg-white p-4 rounded-xl shadow border border-slate-100">
-                        <h3 className="font-bold text-slate-800 mb-4 border-b pb-2 text-sm uppercase tracking-wider">Overall Bundle Action</h3>
+                    <div className="bg-white p-5 rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden relative group">
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-200 via-slate-300 to-slate-200" />
+
+                        <div className="flex items-center gap-2 mb-5">
+                            <div className="p-2 bg-slate-100/80 rounded-lg text-slate-500">
+                                <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Final Decision</h3>
+                        </div>
+
                         <div className="space-y-3">
+                            {/* Request Changes */}
                             <button
                                 onClick={() => handleReviewAction('request_changes')}
                                 disabled={isUpdating}
-                                className="w-full px-4 py-4 bg-stone-100 text-stone-600 rounded-2xl hover:bg-stone-200 disabled:opacity-50 transition-all font-black shadow-sm active:scale-95 uppercase tracking-widest text-[10px]"
+                                className="w-full group/btn relative overflow-hidden bg-white border-2 border-slate-100 hover:border-slate-300 text-slate-600 rounded-xl p-4 transition-all duration-300 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Request Changes (Bundle)
+                                <div className="relative z-10 flex items-center justify-between">
+                                    <div className="flex flex-col items-start gap-1">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Needs Work</span>
+                                        <span className="text-xs font-bold text-slate-700">Request Changes</span>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover/btn:bg-slate-800 group-hover/btn:text-white transition-colors">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                                    </div>
+                                </div>
                             </button>
-                            <button
-                                onClick={() => handleReviewAction('approve')}
-                                disabled={isUpdating}
-                                className="w-full px-4 py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-stone-900 rounded-2xl hover:from-yellow-500 hover:to-yellow-600 disabled:opacity-50 transition-all font-black shadow-xl shadow-yellow-100 active:scale-95 uppercase tracking-widest text-[10px]"
-                            >
-                                Approve Bundle
-                            </button>
+
+                            {/* Submit to Client */}
                             <button
                                 onClick={() => setShowCompleteConfirm(true)}
                                 disabled={isUpdating}
-                                className="w-full px-4 py-4 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 disabled:opacity-50 transition-all font-black shadow-xl shadow-emerald-100 active:scale-95 uppercase tracking-widest text-[10px]"
+                                className="w-full group/btn relative overflow-hidden bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl p-4 transition-all duration-300 shadow-lg shadow-emerald-200 hover:shadow-xl hover:shadow-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Mark as Complete
+                                <div className="absolute inset-0 bg-white/10 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300" />
+                                <div className="relative z-10 flex items-center justify-between">
+                                    <div className="flex flex-col items-start gap-1">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-100">Approved</span>
+                                        <span className="text-xs font-bold">Submit to Client</span>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-400/50 flex items-center justify-center text-white group-hover/btn:scale-110 transition-transform">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Urgent Submission */}
+                            <button
+                                onClick={() => confirmComplete(true)} // Urgent skip
+                                disabled={isUpdating}
+                                className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl p-3 transition-all duration-300 shadow-md shadow-rose-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <div className="relative z-10 flex items-center justify-center gap-2">
+                                    <div className="p-1.5 bg-white/20 rounded-full animate-pulse">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Super Urgent Submission</span>
+                                </div>
                             </button>
                         </div>
                     </div>
@@ -438,7 +540,127 @@ function ReviewerRequestDetail() {
                             ).map(item => (
                                 <TicketItemCard key={item.id} item={item}>
                                     <div className="pt-3 border-t border-slate-200">
-                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-2">Peer Review Status</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                            {/* Status Lifecycle */}
+                                            <div className="group/field">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
+                                                    <Clock className="w-2.5 h-2.5" />
+                                                    Item Lifecycle
+                                                </label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={item.status}
+                                                        onChange={(e) => handleDeveloperStatus(item.id, e.target.value)}
+                                                        disabled={isUpdating}
+                                                        className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none appearance-none cursor-pointer"
+                                                    >
+                                                        {ITEM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                                                </div>
+                                            </div>
+
+                                            {/* Reassignment */}
+                                            <div className="group/field">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
+                                                    <User className="w-2.5 h-2.5" />
+                                                    Assign Developer
+                                                </label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={item.reviewer_id || ""}
+                                                        onChange={(e) => handleItemReassignment(item.id, e.target.value || null)}
+                                                        disabled={isUpdating}
+                                                        className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="">Unassigned</option>
+                                                        {reviewers.filter(r => (r as any).role === 'developer').map(rev => (
+                                                            <option key={rev.id} value={rev.id}>{rev.email} ({(rev as any).role})</option>
+                                                        ))}
+                                                    </select>
+                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Planning Columns */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                            <div className="group/field">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
+                                                    <Clock className="w-2.5 h-2.5" />
+                                                    Effort (Hours)
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={item.estimated_effort}
+                                                    onChange={(e) => handleItemEffortDate(item.id, parseInt(e.target.value) || 0, item.due_date)}
+                                                    disabled={isUpdating}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none"
+                                                />
+                                            </div>
+                                            <div className="group/field">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
+                                                    <Calendar className="w-2.5 h-2.5" />
+                                                    Internal Due Date
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={item.due_date || ""}
+                                                    onChange={(e) => handleItemEffortDate(item.id, item.estimated_effort, e.target.value || null)}
+                                                    disabled={isUpdating}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Technical Information Visibility */}
+                                        <div className="space-y-3 bg-slate-50/50 p-3 rounded-xl border border-dashed border-slate-200">
+                                            <div className="flex items-center gap-2">
+                                                <LinkIcon className="w-3 h-3 text-slate-400" />
+                                                <p className="text-[10px] font-bold text-slate-600 truncate flex-1">
+                                                    <span className="text-slate-400 mr-1">Page:</span>
+                                                    <a href={item.page_url} target="_blank" rel="noopener noreferrer" className="hover:text-yellow-600 underline">
+                                                        {item.page_url}
+                                                    </a>
+                                                </p>
+                                            </div>
+
+                                            {/* Category specific details */}
+                                            {item.categories?.includes('Text') && (
+                                                <div className="space-y-2 text-[10px]">
+                                                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                                                        <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Original Text</span>
+                                                        <p className="text-slate-700 italic">{item.details?.original_text || "N/A"}</p>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                                                        <span className="text-[8px] font-black uppercase text-yellow-600 block mb-1">Updated Text</span>
+                                                        <p className="text-slate-900 font-bold">{item.details?.updated_text || "N/A"}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {item.categories?.includes('Image') && (
+                                                <div className="flex gap-2 text-[10px]">
+                                                    <div className="flex-1 p-2 bg-white rounded-lg border border-slate-100">
+                                                        <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Old Reference</span>
+                                                        <p className="text-slate-700">{item.details?.old_image_ref || "N/A"}</p>
+                                                    </div>
+                                                    {item.details?.new_image && (
+                                                        <div className="w-12 h-12 rounded-lg border border-slate-100 overflow-hidden">
+                                                            <img src={item.details.new_image.url} alt="New" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Existing Peer Review section */}
+                                    <div className="pt-3 border-t border-slate-200">
+                                        <label className="text-[9px] font-black uppercase text-slate-400 block mb-2 flex items-center gap-1">
+                                            <ShieldCheck className="w-2.5 h-2.5" />
+                                            Peer Review Status
+                                        </label>
                                         <div className="space-y-2">
                                             {item.peer_reviewers?.map(pr => (
                                                 <div key={pr.user_id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100">
@@ -481,50 +703,6 @@ function ReviewerRequestDetail() {
                                             )}
                                         </div>
                                     </div>
-
-                                    {item.reviewer_id === user?.id && (
-                                        <div className="pt-3 border-t border-slate-200">
-                                            <p className="text-[9px] font-black uppercase text-yellow-600 mb-2">Assigned Developer Actions</p>
-                                            <div className="flex gap-2">
-                                                {item.status !== 'In Progress' && item.status !== 'Peer Review' && item.status !== 'Complete' && (
-                                                    <button
-                                                        onClick={() => handleDeveloperStatus(item.id, 'In Progress')}
-                                                        disabled={isUpdating}
-                                                        className="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-sm"
-                                                    >
-                                                        Start Work
-                                                    </button>
-                                                )}
-
-                                                {item.status === 'In Progress' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleDeveloperStatus(item.id, 'Peer Review')}
-                                                            disabled={isUpdating}
-                                                            className="flex-1 py-2 bg-blue-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-sm"
-                                                        >
-                                                            Request Peer Review
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeveloperStatus(item.id, 'Complete')}
-                                                            disabled={isUpdating}
-                                                            className="flex-1 py-2 bg-stone-800 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-stone-900 transition-all shadow-sm"
-                                                        >
-                                                            Mark Complete
-                                                        </button>
-                                                    </>
-                                                )}
-
-                                                <button
-                                                    onClick={() => handleDeveloperStatus(item.id, 'Info Needed')}
-                                                    disabled={isUpdating}
-                                                    className="flex-1 py-2 bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-sm"
-                                                >
-                                                    Blocked / Info Needed
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
                                 </TicketItemCard>
                             ))}
                         </div>
@@ -533,35 +711,7 @@ function ReviewerRequestDetail() {
             </div>
 
             {/* Confirmation Modal */}
-            {showConfirm && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center gap-4 text-yellow-600">
-                            <div className="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                            </div>
-                            <h2 className="text-xl font-black uppercase tracking-tight">Confirm Send</h2>
-                        </div>
-                        <p className="text-slate-600 font-medium leading-relaxed">
-                            This message will be visible to the <span className="font-bold text-slate-800">Client</span> and may trigger an email notification. Are you sure you want to proceed?
-                        </p>
-                        <div className="flex gap-3 pt-2">
-                            <button
-                                onClick={() => setShowConfirm(false)}
-                                className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all"
-                            >
-                                Back to Edit
-                            </button>
-                            <button
-                                onClick={sendMessageToClient}
-                                className="flex-1 py-3 bg-yellow-400 text-stone-900 font-black rounded-2xl hover:bg-yellow-500 shadow-lg shadow-yellow-100 transition-all active:scale-95"
-                            >
-                                YES, SEND
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
             {/* Confirmation Modal for Complete */}
             <ConfirmationModal
                 isOpen={showCompleteConfirm}

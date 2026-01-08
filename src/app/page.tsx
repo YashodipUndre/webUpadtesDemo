@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getRequests, Request } from "@/lib/data";
-import { RequestCard } from "@/components/RequestCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { PlusIcon } from "@/components/ui/icons";
+import { MessageSquare, Calendar, Trash2, Eye } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
-const ITEMS_PER_PAGE = 5;
+
 
 export default function DashboardPage() {
   const { role, isLoading } = useAuth();
@@ -19,6 +20,7 @@ export default function DashboardPage() {
     if (!isLoading && role) {
       if (role === 'admin') router.replace('/admin');
       else if (role === 'reviewer') router.replace('/reviewer');
+      else if (role === 'developer') router.replace('/developer');
     }
   }, [role, isLoading, router]);
 
@@ -45,7 +47,7 @@ function ClientDashboardContent() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("DateDesc");
   const router = useRouter();
-  const [page, setPage] = useState(1);
+
 
 
   useEffect(() => {
@@ -65,9 +67,7 @@ function ClientDashboardContent() {
     return () => clearTimeout(timer);
   }, [user?.id]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filter, query, sort]);
+
 
 
   function filtered() {
@@ -198,50 +198,94 @@ function ClientDashboardContent() {
       )}
 
       {/* Main Content Box */}
-      <div className="bg-white border border-slate-200 rounded-3xl min-h-[400px] relative overflow-hidden shadow-sm">
+      <div className="card-premium overflow-hidden bg-white rounded-[2.5rem] border-slate-200 shadow-xl shadow-slate-200/50">
         {filteredRequests.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-4">
+          <div className="flex flex-col items-center justify-center text-center p-20 bg-slate-50/50">
+            <div className="w-16 h-16 bg-white shadow-xl shadow-slate-200 text-slate-300 rounded-3xl flex items-center justify-center mb-4 transform -rotate-6">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <h3 className="text-base font-bold text-slate-900 mb-1">No requests found</h3>
             <p className="text-sm text-slate-500 font-medium">Try clearing search or changing filters.</p>
           </div>
         ) : (
-          <div className="flex flex-col h-full">
-            <div className="p-4 grid grid-cols-1 gap-1 flex-1">
-              {filteredRequests.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((r) => (
-                <RequestCard
-                  key={r.id}
-                  request={r}
-                  onOpen={() => router.push(`/requests/${r.id}`)}
-                />
-              ))}
-            </div>
-            {/* Pagination Controls */}
-            {filteredRequests.length > ITEMS_PER_PAGE && (
-              <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100 mt-auto">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                  Previous
-                </button>
-                <span className="text-xs font-bold text-slate-400">
-                  Page {page} of {Math.ceil(filteredRequests.length / ITEMS_PER_PAGE)}
-                </span>
-                <button
-                  onClick={() => setPage(p => Math.min(Math.ceil(filteredRequests.length / ITEMS_PER_PAGE), p + 1))}
-                  disabled={page >= Math.ceil(filteredRequests.length / ITEMS_PER_PAGE)}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                  Next
-                </button>
-              </div>
-            )}
+          <div className="overflow-x-auto h-[400px] overflow-y-auto scrollbar-hide">
+            <table className="w-full table-auto min-w-[800px]">
+              <thead>
+                <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
+                  <th className="px-6 py-5">Ref</th>
+                  <th className="px-6 py-5">Request Information</th>
+                  <th className="px-6 py-5">Status</th>
+                  <th className="px-6 py-5">Urgency</th>
+                  <th className="px-6 py-5">Timeline</th>
+                  <th className="px-6 py-5 text-right">Activity</th>
+                  <th className="px-6 py-5 text-right">Access</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filteredRequests.map((r) => {
+                  const createdDate = new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+                  return (
+                    <tr
+                      key={r.id}
+                      onClick={() => router.push(`/requests/${r.id}`)}
+                      className={`hover:bg-slate-50/80 transition-all group cursor-pointer ${r.urgency === 'Urgent' ? 'bg-red-50/20' : ''}`}
+                    >
+                      <td className="px-6 py-5">
+                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px] border border-slate-200 group-hover:bg-yellow-400 group-hover:text-stone-900 group-hover:border-yellow-400 transition-colors">
+                          #{r.id.slice(0, 4)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm group-hover:text-yellow-600 transition-colors leading-tight line-clamp-1">{r.title}</p>
+                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1.5 flex items-center gap-1">
+                            {r.items?.length || 0} {r.items?.length === 1 ? 'Action Item' : 'Action Items'}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${r.urgency === 'Urgent'
+                          ? 'bg-rose-50 text-rose-600 border-rose-100 shadow-sm shadow-rose-100'
+                          : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                        >
+                          {r.urgency}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <Calendar className="w-3 h-3" />
+                          <span className="text-[11px] font-bold">{createdDate}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-100 rounded-lg text-slate-400 group-hover:border-slate-200 transition-all">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-black">{r.total_messages || 0}</span>
+                          </div>
+                          {r.unseen_count! > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse shadow-sm shadow-yellow-200" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <div className="inline-flex items-center justify-center text-slate-300 group-hover:text-yellow-600 transition-colors">
+                          <Eye className="w-5 h-5 transform group-hover:scale-110 transition-transform" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
+
+
       </div>
     </div>
   );

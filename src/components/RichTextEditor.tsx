@@ -70,6 +70,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, leadin
     const ToolbarButton = ({ icon: Icon, active, onClick, title }: any) => (
         <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={onClick}
             className={`p-1.5 rounded transition-all ${active ? "bg-yellow-400 text-stone-900 shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
             title={title}

@@ -82,6 +82,24 @@ function AdminReports() {
         Complete: requests.filter(r => r.status === 'Complete').length,
     };
 
+    // 4. SLA Compliance Calculation
+    const completedRequests = requests.filter(r => r.status === 'Complete');
+    const slaMetCount = completedRequests.filter(r => {
+        if (!r.sla_due_date) return true; // No SLA = Met
+        // Find completion date from audit logs
+        const completionLog = r.audit_logs?.slice().reverse().find(l => l.new_value === 'Complete');
+        // If no log found, assume strictly it's not verifiable, but for dummy data filtering we might be lenient or use created_at if completed immediately.
+        // Let's use current time if completed but no log (e.g. data init), likely failing if old SLA.
+        // Actually, if status is Complete and no log, let's look at r.updated_at if it exists? No.
+        // Optimistic approach for demo: if complete, check against SLA. If no completion time is recorded, we can't really judge.
+        // Let's assume valid data would have audit log.
+        const completionDate = completionLog ? new Date(completionLog.created_at) : new Date();
+
+        return completionDate <= new Date(r.sla_due_date);
+    }).length;
+
+    const slaPercentage = completedRequests.length > 0 ? Math.round((slaMetCount / completedRequests.length) * 100) : 100;
+
     return (
         <div className="space-y-10 max-w-7xl mx-auto pb-20">
             <header className="space-y-2">
@@ -103,7 +121,7 @@ function AdminReports() {
                 <StatCard title="Total Tickets" value={requests.length} icon={<BarChart3 className="w-5 h-5" />} color="yellow" />
                 <StatCard title="Active Workload" value={statusCounts['In Progress']} icon={<Clock className="w-5 h-5" />} color="blue" />
                 <StatCard title="High Urgency" value={requests.filter(r => r.urgency === 'Urgent').length} icon={<AlertCircle className="w-5 h-5" />} color="rose" />
-                <StatCard title="Avg Resolution Time" value="1.2 Days" icon={<CheckCircle className="w-5 h-5" />} color="emerald" />
+                <StatCard title="SLA Compliance" value={`${slaPercentage}%`} icon={<CheckCircle className="w-5 h-5" />} color="emerald" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -145,8 +163,59 @@ function AdminReports() {
                     </div>
                 </section>
 
+                {/* SLA Performance */}
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            SLA Performance
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium font-mono uppercase tracking-tighter">On-Time Completion Rate</p>
+                    </div>
+
+                    <div className="flex items-center gap-8">
+                        <div className="relative w-32 h-32 flex-shrink-0">
+                            <svg viewBox="0 0 36 36" className="w-full h-full rotate-[-90deg]">
+                                <path className="text-slate-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.8" />
+                                <motion.path
+                                    initial={{ strokeDasharray: "0, 100" }}
+                                    animate={{ strokeDasharray: `${(completedRequests.length > 0 ? (slaMetCount / completedRequests.length) * 100 : 0)}, 100` }}
+                                    className="text-emerald-500"
+                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3.8"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-2xl font-black text-slate-800">
+                                    {completedRequests.length > 0 ? Math.round((slaMetCount / completedRequests.length) * 100) : 0}%
+                                </span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">Met</span>
+                            </div>
+                        </div>
+                        <div className="space-y-4 flex-1">
+                            <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase text-emerald-800 tracking-wide">Within Estimate</p>
+                                    <p className="text-lg font-black text-emerald-600">{slaMetCount}</p>
+                                </div>
+                                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-rose-50 rounded-xl border border-rose-100">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase text-rose-800 tracking-wide">Overdue</p>
+                                    <p className="text-lg font-black text-rose-600">{completedRequests.length - slaMetCount}</p>
+                                </div>
+                                <AlertCircle className="w-5 h-5 text-rose-400" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Ticket Volume Chart */}
-                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6 flex flex-col">
+                <section className="bg-white rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-200/40 p-6 flex flex-col lg:col-span-2">
                     <div className="mb-6">
                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
                             <TrendingUp className="w-4 h-4 text-yellow-500" />

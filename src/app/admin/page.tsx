@@ -6,9 +6,9 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getRequests, updateRequestStatus, Request, getReviewers, assignRequest, bulkAssignRequests, sendMessage } from "@/lib/data";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth-context";
-import { BarChart3, Activity, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { BarChart3, Activity, AlertCircle, Clock, CheckCircle2, Eye } from "lucide-react";
 
-const ITEMS_PER_PAGE = 5;
+
 
 export default function AdminDashboardPage() {
     return (
@@ -36,7 +36,7 @@ function AdminDashboard() {
         category: "All",
         active: "All",
     });
-    const [page, setPage] = useState(1);
+
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -191,7 +191,7 @@ function AdminDashboard() {
                         disabled={selected.size === 0 || isLoading}
                         className="px-5 py-2 bg-stone-900 text-white rounded-xl hover:bg-stone-800 disabled:opacity-40 transition-all shadow-md shadow-stone-200 font-bold text-xs active:scale-95"
                     >
-                        Bulk Close
+                        Bulk Complete
                     </button>
                 </div>
             </header>
@@ -338,7 +338,7 @@ function AdminDashboard() {
             }
 
             <div className="card-premium overflow-hidden bg-white rounded-[2.5rem] border-slate-200 shadow-xl shadow-slate-200/50">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto h-[400px] overflow-y-auto scrollbar-hide">
                     <table className="w-full table-auto min-w-[900px]">
                         <thead>
                             <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
@@ -362,14 +362,14 @@ function AdminDashboard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {visible.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).length === 0 ? (
+                            {visible.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="px-6 py-16 text-center text-slate-400 font-bold italic text-sm">
                                         No matching operational requests identified.
                                     </td>
                                 </tr>
                             ) : (
-                                visible.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((r) => {
+                                visible.map((r) => {
                                     const getSLAStatus = (slaDate: string | null, status: string) => {
                                         if (status === 'Complete') return { label: 'Met', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
                                         if (!slaDate) return { label: 'No SLA', color: 'bg-slate-50 text-slate-400 border-slate-100' };
@@ -442,11 +442,9 @@ function AdminDashboard() {
                                             <td className="px-6 py-5 text-right">
                                                 <Link
                                                     href={`/admin/requests/${r.id}`}
-                                                    className="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-yellow-600 hover:border-yellow-600 hover:bg-yellow-50 transition-all shadow-sm"
+                                                    className="inline-flex items-center justify-center text-slate-300 hover:text-yellow-600 transition-colors"
                                                 >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-                                                    </svg>
+                                                    <Eye className="w-5 h-5 hover:scale-110 transition-transform" />
                                                 </Link>
                                             </td>
                                         </tr>
@@ -458,27 +456,7 @@ function AdminDashboard() {
                 </div>
             </div>
             {/* Pagination Controls */}
-            {visible.length > ITEMS_PER_PAGE && (
-                <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100">
-                    <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                    >
-                        Previous
-                    </button>
-                    <span className="text-xs font-bold text-slate-400">
-                        Page {page} of {Math.ceil(visible.length / ITEMS_PER_PAGE)}
-                    </span>
-                    <button
-                        onClick={() => setPage(p => Math.min(Math.ceil(visible.length / ITEMS_PER_PAGE), p + 1))}
-                        disabled={page >= Math.ceil(visible.length / ITEMS_PER_PAGE)}
-                        className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                    >
-                        Next
-                    </button>
-                </div>
-            )}
+
         </div>
     );
 }

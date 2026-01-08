@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RequestItem, DYNAMIC_CATEGORIES, CategoryType } from '@/lib/data';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Hash, ChevronDown, Link as LinkIcon } from 'lucide-react';
 
 interface TicketItemCardProps {
     item: RequestItem;
@@ -9,44 +10,61 @@ interface TicketItemCardProps {
 
 export function TicketItemCard({ item, children }: TicketItemCardProps) {
     const [selectedCat, setSelectedCat] = useState<string | null>(null);
+    const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden hover:shadow-2xl hover:shadow-yellow-100/20 transition-all duration-300">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-yellow-100/20 transition-all duration-300">
             {/* Header / ID Bar */}
-            <div className="px-6 py-5 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-100 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <span className="mt-1 w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-stone-900 font-black text-sm shadow-md shadow-yellow-200 flex-shrink-0">
-                        #{item.item_number}
-                    </span>
-                    <div className="flex flex-col min-w-0 flex-1">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            {item.categories?.map((cat, idx) => {
+            <div className={`px-5 py-4 bg-white transition-colors duration-300 ${selectedCat ? 'bg-slate-50/50' : ''} ${!selectedCat ? 'rounded-b-2xl' : 'border-b border-slate-100'}`}>
+                <div className="flex gap-4">
+                    {/* Left: ID Badge */}
+                    <div className="flex-shrink-0 pt-0.5">
+                        <span className="w-9 h-9 rounded-lg bg-yellow-400 text-stone-900 flex items-center justify-center font-black text-xs shadow-sm shadow-yellow-200">
+                            #{item.item_number}
+                        </span>
+                    </div>
+
+                    {/* Middle: Content */}
+                    <div className="flex-1 min-w-0 space-y-3">
+                        {/* Top: Description & Status */}
+                        <div className="flex items-start justify-between gap-4">
+                            <h4 className="text-sm font-bold text-slate-800 leading-snug line-clamp-2 pt-0.5" title={item.description}>
+                                {item.description}
+                            </h4>
+                            <div className="flex-shrink-0">
+                                <StatusBadge status={item.status} />
+                            </div>
+                        </div>
+
+                        {/* Bottom: Inline Scrollable Category Tabs */}
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -ml-1 pl-1 mask-linear-fade">
+                            {item.categories?.map(cat => {
                                 const isActive = selectedCat === cat;
                                 return (
                                     <button
-                                        key={idx}
-                                        onClick={() => setSelectedCat(isActive ? null : cat as string)}
-                                        className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all border shadow-sm ${isActive
-                                            ? "bg-stone-900 border-stone-900 text-white transform scale-105"
-                                            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300"
-                                            }`}
+                                        key={cat}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedCat(isActive ? null : cat);
+                                        }}
+                                        className={`
+                                            flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border
+                                            ${isActive
+                                                ? 'bg-slate-800 text-white border-slate-800 shadow-md shadow-slate-200 transform scale-105'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'}
+                                        `}
                                     >
+                                        <Hash className={`w-3 h-3 ${isActive ? 'text-yellow-400' : 'text-slate-400'}`} />
                                         {cat}
                                     </button>
                                 );
-                            }) ?? (
-                                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 border border-slate-200">
-                                        Uncategorized
-                                    </span>
-                                )}
+                            })}
+
+                            {(!item.categories || item.categories.length === 0) && (
+                                <span className="text-[10px] text-slate-400 italic px-2">No categories</span>
+                            )}
                         </div>
-                        <h4 className="text-base font-black text-slate-800 leading-snug line-clamp-2 pr-4" title={item.description}>
-                            {item.description}
-                        </h4>
                     </div>
-                </div>
-                <div className="mt-1 flex-shrink-0">
-                    <StatusBadge status={item.status} />
                 </div>
             </div>
 

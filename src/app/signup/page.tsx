@@ -37,6 +37,7 @@ export default function SignupPage() {
             await signup(email, role as any);
 
             if (role === 'admin') router.push('/admin');
+            else if (role === 'developer') router.push('/developer');
             else if (role === 'reviewer') router.push('/reviewer');
             else router.push('/');
         } catch (err: any) {
@@ -117,6 +118,7 @@ export default function SignupPage() {
                                     className="w-full p-3.5 bg-white/80 border border-slate-200 rounded-xl focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none font-bold text-sm text-slate-700 appearance-none cursor-pointer shadow-sm"
                                 >
                                     <option value="client">Client</option>
+                                    <option value="developer">Developer</option>
                                     <option value="reviewer">Peer Reviewer</option>
                                     <option value="admin">System Admin</option>
                                 </select>

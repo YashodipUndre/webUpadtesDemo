@@ -24,8 +24,9 @@ export default function LoginPage() {
 
             if (selectedRole === 'client') router.push('/');
             else if (selectedRole === 'admin') router.push('/admin');
+            else if (selectedRole === 'developer') router.push('/developer');
             else if (selectedRole === 'reviewer') router.push('/reviewer');
-            else if (selectedRole === 'developer') router.push('/reviewer');
+            else if (selectedRole === 'developer') router.push('/developer');
             else router.push('/');
         } catch (err: any) {
             setError(err.message);
@@ -85,15 +86,23 @@ export default function LoginPage() {
 
                         <div className="relative group">
                             <label className="block text-[9px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest transition-colors group-focus-within:text-yellow-600">Access Role</label>
-                            <select
-                                value={selectedRole}
-                                onChange={(e) => setSelectedRole(e.target.value)}
-                                className="w-full p-3.5 bg-white/80 border border-slate-200 rounded-xl focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none font-bold text-sm text-slate-700 shadow-sm appearance-none cursor-pointer"
-                            >
-                                <option value="client">Client</option>
-                                <option value="admin">System Admin</option>
-                                <option value="reviewer">Peer Reviewer</option>
-                            </select>
+                            <div className="relative">
+                                <select
+                                    value={selectedRole}
+                                    onChange={(e) => setSelectedRole(e.target.value)}
+                                    className="w-full p-3.5 bg-white/80 border border-slate-200 rounded-xl focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none font-bold text-sm text-slate-700 shadow-sm appearance-none cursor-pointer"
+                                >
+                                    <option value="client">Client</option>
+                                    <option value="developer">Developer</option>
+                                    <option value="reviewer">Peer Reviewer</option>
+                                    <option value="admin">System Admin</option>
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

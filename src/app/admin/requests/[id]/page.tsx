@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { getRequestById, updateRequestStatus, sendMessage, Request, updateItemStatus, updateItemEffortAndDate, getReviewers, assignItem, Attachment, isPeerReviewAdmin, addPeerReviewer, updateRequestSLA, updateItemExternalLinks } from "@/lib/data";
+import { getRequestById, updateRequestStatus, sendMessage, Request, updateItemStatus, updateItemEffortAndDate, getReviewers, assignItem, Attachment, isPeerReviewAdmin, addPeerReviewer, updateRequestSLA, updateItemExternalLinks, removePeerReviewer, submitPeerReviewDecision, fileToBase64 } from "@/lib/data";
 import { StatusBadge } from "@/components/StatusBadge";
+import { RequestTimeline } from "@/components/RequestTimeline";
 import { TicketItemCard } from "@/components/TicketItemCard";
 import { useAuth } from "@/lib/auth-context";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
-import { Settings, Calendar, ShieldCheck, Clock, AlertTriangle, Timer, Activity, User } from "lucide-react";
+import { Settings, Calendar, ShieldCheck, Clock, AlertTriangle, Timer, Activity, User, X as XIcon } from "lucide-react";
 
 const ITEMS_PER_PAGE = 3;
 
@@ -188,14 +189,19 @@ function AdminRequestDetail() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
+            <div className="flex items-center justify-between gap-6">
+                <div className="min-w-[250px]">
                     <h1 className="text-2xl font-bold">Admin — {request.title}</h1>
                     <p className="text-sm text-gray-600">
                         Client: {request.profiles?.email} • Created: {new Date(request.created_at).toLocaleDateString()}
                     </p>
                 </div>
-                <div className="text-right">
+
+                <div className="flex-1 hidden px-6 lg:block">
+                    <RequestTimeline request={request} />
+                </div>
+
+                <div className="text-right flex-shrink-0">
                     <StatusBadge status={request.status} />
                     <div className="text-sm mt-2 font-medium">
                         Urgency: <span className={request.urgency === 'Urgent' ? 'text-red-600 font-bold' : ''}>{request.urgency}</span>
@@ -242,13 +248,20 @@ function AdminRequestDetail() {
                                 return (
                                     <div
                                         key={m.id}
-                                        className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}
+                                        className={`flex w-full gap-3 ${isMe ? "justify-end" : "justify-start"}`}
                                     >
+                                        {!isMe && (
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 shadow-sm mt-1">
+                                                {m.profiles?.email?.substring(0, 2).toUpperCase() || "??"}
+                                            </div>
+                                        )}
+
                                         <div className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
                                             <div className="flex items-center gap-2 mb-1 px-1">
                                                 {!isMe && (
-                                                    <span className="text-[10px] font-bold text-yellow-600">
+                                                    <span className="text-[10px] font-bold text-slate-600">
                                                         {m.profiles?.email.split('@')[0]}
+                                                        <span className="text-slate-400 font-normal ml-1 capitalize">({m.profiles?.role || 'Unknown'})</span>
                                                     </span>
                                                 )}
                                                 {isInternal && (
@@ -295,10 +308,16 @@ function AdminRequestDetail() {
                                                 )}
                                             </div>
 
-                                            <span className="text-[9px] text-yellow-600 mt-1 px-1 select-none">
+                                            <span className="text-[9px] text-slate-400 mt-1 px-1 select-none">
                                                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
+
+                                        {isMe && (
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center text-[10px] font-black text-yellow-700 shadow-sm mt-1">
+                                                ME
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -342,7 +361,11 @@ function AdminRequestDetail() {
                                             </button>
                                         </div>
                                     )}
-                                    <div className="bg-white rounded-xl shadow-sm transition-all overflow-hidden">
+                                    <div className="bg-white rounded-xl shadow-sm transition-all overflow-hidden border border-slate-200">
+                                        <div className="bg-yellow-50/50 px-4 py-2 border-b border-yellow-100 flex items-center gap-2 text-[10px] font-bold text-yellow-700 uppercase tracking-wide">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                            Warning: This message will be visible to the client
+                                        </div>
                                         <RichTextEditor
                                             value={clientMessage}
                                             onChange={setClientMessage}
@@ -350,13 +373,13 @@ function AdminRequestDetail() {
                                             className="min-h-[80px]"
                                             leadingActions={
                                                 <label className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer transition-all" title="Attach">
-                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) setClientAttachment({ name: file.name, url: URL.createObjectURL(file), type: file.type }); }} />
+                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { const url = await fileToBase64(file); setClientAttachment({ name: file.name, url, type: file.type }); } }} />
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                                 </label>
                                             }
                                             trailingActions={
                                                 <button
-                                                    onClick={() => setShowConfirm(true)}
+                                                    onClick={sendMessageToClient}
                                                     disabled={isUpdating || (!clientMessage.trim() && !clientAttachment)}
                                                     className="px-4 py-2 bg-yellow-400 text-stone-900 text-xs font-black uppercase tracking-wider rounded-lg hover:bg-yellow-500 disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 transition-all shadow-sm active:scale-95 flex items-center gap-2"
                                                 >
@@ -394,7 +417,7 @@ function AdminRequestDetail() {
                                             className="min-h-[80px]"
                                             leadingActions={
                                                 <label className="p-2 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-lg cursor-pointer transition-all" title="Attach to Internal">
-                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) setInternalAttachment({ name: file.name, url: URL.createObjectURL(file), type: file.type }); }} />
+                                                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { const url = await fileToBase64(file); setInternalAttachment({ name: file.name, url, type: file.type }); } }} />
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                                 </label>
                                             }
@@ -632,6 +655,11 @@ function AdminRequestDetail() {
                                                 className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold disabled:bg-slate-50 disabled:text-slate-400"
                                             >
                                                 <option value="">Unassigned</option>
+                                                {reviewers.filter(r => (r as any).role === 'developer').map(rev => (
+                                                    <option key={rev.id} value={rev.id}>
+                                                        {rev.email} ({(rev as any).role})
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
 
@@ -639,13 +667,46 @@ function AdminRequestDetail() {
                                             <label className="text-[9px] font-black uppercase text-slate-400 block mb-2">Assigned Reviewers ({item.peer_reviewers?.length || 0})</label>
                                             <div className="space-y-2">
                                                 {item.peer_reviewers?.map(pr => (
-                                                    <div key={pr.user_id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                                                        <span className="text-[10px] font-bold text-slate-600">{pr.email.split('@')[0]}</span>
-                                                        <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${pr.decision === 'Yes' ? 'bg-emerald-100 text-emerald-700' :
-                                                            pr.decision === 'No' ? 'bg-rose-100 text-rose-700' :
-                                                                'bg-slate-100 text-slate-400'
-                                                            }`}>
-                                                            {pr.decision || 'PENDING'}
+                                                    <div key={pr.user_id} className="flex flex-col gap-1.5 p-2 bg-slate-50 border border-slate-100 rounded-xl group/pr relative">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[10px] font-bold text-slate-700">{pr.email.split('@')[0]}</span>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    await removePeerReviewer(request.id, item.id, pr.user_id);
+                                                                    const updated = await getRequestById(id, user?.id, 'admin');
+                                                                    setRequest(updated);
+                                                                }}
+                                                                className="text-slate-300 hover:text-rose-500 transition-colors"
+                                                            >
+                                                                <XIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                        <div className="w-full">
+                                                            {(() => {
+                                                                const decision = pr.decision;
+                                                                let label = 'Pending';
+                                                                let className = 'bg-slate-100 text-slate-500 border-slate-200';
+                                                                let icon = null;
+
+                                                                if (decision === 'Yes') {
+                                                                    label = 'Approved';
+                                                                    className = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                                                                    icon = <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>;
+                                                                } else if (decision === 'No') {
+                                                                    label = 'Not Approved';
+                                                                    className = 'bg-rose-100 text-rose-700 border-rose-200';
+                                                                    icon = <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>;
+                                                                } else {
+                                                                    icon = <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`w-full py-2 px-3 rounded-lg border flex items-center justify-center gap-2 ${className}`}>
+                                                                        {icon}
+                                                                        <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -765,38 +826,7 @@ function AdminRequestDetail() {
                 </div>
             </section >
 
-            {/* Confirmation Modal */}
-            {
-                showConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
-                            <div className="flex items-center gap-4 text-yellow-600">
-                                <div className="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                </div>
-                                <h2 className="text-xl font-black uppercase tracking-tight">Confirm Send</h2>
-                            </div>
-                            <p className="text-slate-600 font-medium leading-relaxed">
-                                This message will be visible to the <span className="font-bold text-slate-800">Client</span> and may trigger an email notification. Are you sure you want to proceed?
-                            </p>
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    onClick={() => setShowConfirm(false)}
-                                    className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all"
-                                >
-                                    Back to Edit
-                                </button>
-                                <button
-                                    onClick={sendMessageToClient}
-                                    className="flex-1 py-3 bg-yellow-400 text-stone-900 font-black rounded-2xl hover:bg-yellow-500 shadow-lg shadow-yellow-100 transition-all active:scale-95"
-                                >
-                                    YES, SEND
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+
 
             {/* Confirmation Modal for Complete */}
             <ConfirmationModal

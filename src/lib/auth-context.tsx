@@ -36,6 +36,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const stored = localStorage.getItem(SESSION_KEY);
         if (stored) {
             const data = JSON.parse(stored);
+
+            // Enforce correct IDs for known test accounts to ensure assignments work
+            // even if the user has an old session stored
+            if (data.email === 'developer1@dummy.com') data.id = 'dev-1';
+            else if (data.email === 'developer2@dummy.com') data.id = 'dev-2';
+            else if (data.email === 'developer3@dummy.com') data.id = 'dev-3';
+            else if (data.email === 'reviewer1@dummy.com') data.id = 'rev-1';
+            else if (data.email === 'reviewer2@dummy.com') data.id = 'rev-2';
+            else if (data.email === 'admin@dummy.com') data.id = 'admin-1';
+
             setUser(data);
         }
         setIsLoading(false);
@@ -57,6 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (email === 'reviewer1@dummy.com') id = 'rev-1';
         else if (email === 'reviewer2@dummy.com') id = 'rev-2';
         else if (email === 'admin@dummy.com') id = 'admin-1';
+        else if (email === 'developer1@dummy.com') id = 'dev-1';
+        else if (email === 'developer2@dummy.com') id = 'dev-2';
+        else if (email === 'developer3@dummy.com') id = 'dev-3';
 
         const dummyUser: LocalUser = {
             id,

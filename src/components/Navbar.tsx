@@ -15,6 +15,7 @@ export function Navbar() {
         { href: "/admin", label: "Overview", show: role === "admin" },
         { href: "/admin/reports", label: "Reports", show: role === "admin" },
         { href: "/reviewer", label: "Reviews", show: role === "reviewer" },
+        { href: "/developer", label: "Dev Queue", show: role === "developer" },
     ].filter(link => link.show);
 
     return (

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { getRequestById, updateRequestStatus, sendMessage as sendSupabaseMessage, Request, Attachment } from "@/lib/data";
+import { getRequestById, updateRequestStatus, sendMessage as sendSupabaseMessage, Request, Attachment, fileToBase64 } from "@/lib/data";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TicketItemCard } from "@/components/TicketItemCard";
 import { useAuth } from "@/lib/auth-context";
@@ -146,13 +146,20 @@ function ClientRequestDetail() {
                                         return (
                                             <div
                                                 key={m.id}
-                                                className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}
+                                                className={`flex w-full gap-3 ${isMe ? "justify-end" : "justify-start"}`}
                                             >
+                                                {!isMe && (
+                                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 shadow-sm mt-1">
+                                                        {m.profiles?.email?.substring(0, 2).toUpperCase() || "ST"}
+                                                    </div>
+                                                )}
+
                                                 <div className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
                                                     <div className="flex items-center gap-2 mb-1 px-1">
                                                         {!isMe && (
-                                                            <span className="text-[10px] font-bold text-yellow-600">
-                                                                Support Team
+                                                            <span className="text-[10px] font-bold text-slate-600">
+                                                                {m.profiles?.email ? m.profiles.email.split('@')[0] : 'Support Team'}
+                                                                <span className="text-slate-400 font-normal ml-1 capitalize">({m.profiles?.role || 'Admin'})</span>
                                                             </span>
                                                         )}
                                                     </div>
@@ -191,10 +198,16 @@ function ClientRequestDetail() {
                                                         )}
                                                     </div>
 
-                                                    <span className="text-[9px] text-yellow-600 mt-1 px-1 select-none">
+                                                    <span className="text-[9px] text-slate-400 mt-1 px-1 select-none">
                                                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
+
+                                                {isMe && (
+                                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center text-[10px] font-black text-yellow-500 shadow-sm mt-1">
+                                                        ME
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })
@@ -229,7 +242,7 @@ function ClientRequestDetail() {
                                     className="min-h-[80px]"
                                     leadingActions={
                                         <label className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer transition-all" title="Attach">
-                                            <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) setAttachment({ name: file.name, url: URL.createObjectURL(file), type: file.type }); }} />
+                                            <input type="file" className="hidden" accept="image/*,.pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { const url = await fileToBase64(file); setAttachment({ name: file.name, url, type: file.type }); } }} />
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         </label>
                                     }

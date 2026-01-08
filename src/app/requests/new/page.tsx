@@ -15,7 +15,7 @@ export default function NewRequestPage() {
 }
 
 interface RequestItemForm {
-    categories: CategoryType[];
+    category: CategoryType;
     dynamicValues: Record<string, string>;
 }
 
@@ -25,13 +25,13 @@ function NewRequestForm() {
     const [title, setTitle] = useState("");
     const [urgency, setUrgency] = useState("Normal");
     const [items, setItems] = useState<RequestItemForm[]>([
-        { categories: ["Text"], dynamicValues: {} }
+        { category: "Text", dynamicValues: {} }
     ]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const addItem = () => {
-        setItems([...items, { categories: ["Text"], dynamicValues: {} }]);
+        setItems([...items, { category: "Text", dynamicValues: {} }]);
     };
 
     const removeItem = (index: number) => {
@@ -46,15 +46,8 @@ function NewRequestForm() {
         setItems(newItems);
     };
 
-    const toggleCategory = (index: number, category: CategoryType) => {
-        const item = items[index];
-        const current = new Set(item.categories);
-        if (current.has(category)) {
-            if (current.size > 1) current.delete(category); // Prevent empty
-        } else {
-            current.add(category);
-        }
-        updateItem(index, { categories: Array.from(current) });
+    const setCategory = (index: number, category: CategoryType) => {
+        updateItem(index, { category });
     };
 
     const handleFieldChange = (itemIndex: number, fieldId: string, value: string) => {
@@ -73,9 +66,8 @@ function NewRequestForm() {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             // Merge fields from all selected categories
-            const allFields = item.categories.flatMap(cat =>
-                DYNAMIC_CATEGORIES.find(c => c.id === cat)?.fields || []
-            );
+            const allFields = DYNAMIC_CATEGORIES.find(c => c.id === item.category)?.fields || [];
+
             // Deduplicate fields by ID
             const uniqueFields = Array.from(new Map(allFields.map(f => [f.id, f])).values());
 
@@ -93,7 +85,7 @@ function NewRequestForm() {
 
         try {
             const formattedItems = items.map(it => ({
-                categories: it.categories,
+                categories: [it.category],
                 description: it.dynamicValues.description || it.dynamicValues.original_text || title,
                 pageUrl: it.dynamicValues.page_url || "",
                 details: it.dynamicValues
@@ -141,25 +133,28 @@ function NewRequestForm() {
 
                     <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Urgency Level</label>
-                        <select
-                            value={urgency}
-                            onChange={(e) => setUrgency(e.target.value)}
-                            className={`w-full p-3 border rounded-xl focus:ring-4 transition-all outline-none font-black text-sm appearance-none cursor-pointer shadow-sm ${urgency === "Urgent"
-                                ? "bg-red-50 border-red-200 text-red-600 focus:ring-red-500/10 focus:border-red-500"
-                                : "bg-white/80 border-slate-200 text-slate-700 focus:ring-yellow-400/20 focus:border-yellow-400"
-                                }`}
-                        >
-                            <option>Normal</option>
-                            <option>Urgent</option>
-                        </select>
+                        <div className="relative">
+                            <select
+                                value={urgency}
+                                onChange={(e) => setUrgency(e.target.value)}
+                                className={`w-full p-3 border rounded-xl focus:ring-4 transition-all outline-none font-black text-sm appearance-none cursor-pointer shadow-sm ${urgency === "Urgent"
+                                    ? "bg-red-50 border-red-200 text-red-600 focus:ring-red-500/10 focus:border-red-500"
+                                    : "bg-white/80 border-slate-200 text-slate-700 focus:ring-yellow-400/20 focus:border-yellow-400"
+                                    }`}
+                            >
+                                <option>Normal</option>
+                                <option>Urgent</option>
+                            </select>
+                            <div className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${urgency === "Urgent" ? "text-red-400" : "text-slate-400"}`}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div className="space-y-8">
                     {items.map((item, index) => {
-                        const allFields = item.categories.flatMap(cat =>
-                            DYNAMIC_CATEGORIES.find(c => c.id === cat)?.fields || []
-                        );
+                        const allFields = DYNAMIC_CATEGORIES.find(c => c.id === item.category)?.fields || [];
                         const uniqueFields = Array.from(new Map(allFields.map(f => [f.id, f])).values());
 
                         return (
@@ -184,12 +179,12 @@ function NewRequestForm() {
                                     <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Update Categories</label>
                                     <div className="flex flex-wrap gap-2">
                                         {DYNAMIC_CATEGORIES.filter(c => c.enabled).map(c => {
-                                            const isSelected = item.categories.includes(c.id);
+                                            const isSelected = item.category === c.id;
                                             return (
                                                 <button
                                                     key={c.id}
                                                     type="button"
-                                                    onClick={() => toggleCategory(index, c.id)}
+                                                    onClick={() => setCategory(index, c.id)}
                                                     className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${isSelected
                                                         ? "bg-yellow-400 border-yellow-500 text-stone-900 shadow-sm"
                                                         : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"

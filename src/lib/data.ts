@@ -138,6 +138,23 @@ export type Request = {
 const REQUESTS_KEY = "dummy_requests_v2";
 const MESSAGES_KEY = "dummy_messages_v2";
 
+export const ITEM_STATUSES = [
+    'New',
+    'In Progress',
+    'Info Needed',
+    'Peer Review',
+    'Complete',
+    'Reopened'
+];
+
+export const RESPONSE_TEMPLATES = [
+    { label: "General Update", text: "I've started working on this request. I will provide another update once I hit the next milestone." },
+    { label: "Request Clarification", text: "Could you please provide more details or an example for this item? I want to make sure the implementation matches your vision exactly." },
+    { label: "Ready for Peer Review", text: "The development for this item is finished. I am now submitting it for technical validation." },
+    { label: "Deployment Notice", text: "The changes have been deployed to the live site. Please review and let us know if everything looks correct." },
+    { label: "Delay Notification", text: "Due to some technical complexities, this item is taking a bit longer than expected. I anticipate a new completion date by tomorrow EOD." }
+];
+
 // Helper to get from local storage
 function getStored<T>(key: string, defaultVal: T): T {
     if (typeof window === 'undefined') return defaultVal;
@@ -209,6 +226,34 @@ const initialRequests: Request[] = [
                 created_at: new Date().toISOString()
             }
         ]
+    },
+    {
+        id: "3",
+        title: "Implement API Integration for Newsletter",
+        client_id: "client-3",
+        status: "In Progress",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
+        profiles: { email: "tech@startupschool.edu", school: "Startup School" },
+        items: [
+            {
+                id: "item-3",
+                request_id: "3",
+                item_number: 1,
+                categories: ['Text', 'Defect'],
+                description: "Connect the newsletter signup form to Mailchimp API",
+                page_url: "https://startupschool.edu/newsletter",
+                details: {},
+                status: "In Progress",
+                assigned_to: "developer1@dummy.com",
+                reviewer_id: "dev-1", // Assigned to Developer 1
+                estimated_effort: 4,
+                due_date: new Date(Date.now() + 172800000).toISOString(),
+                peer_reviewers: [],
+                created_at: new Date(Date.now() - 43200000).toISOString()
+            }
+        ]
     }
 ];
 
@@ -241,7 +286,7 @@ export async function getRequests(currentUserId?: string, userRole?: string) {
     return requests.map(r => {
         const rMessages = messages.filter(m => m.request_id === r.id);
         const visible = rMessages.filter(m => {
-            if (userRole === 'admin' || userRole === 'reviewer') return true;
+            if (userRole === 'admin' || userRole === 'reviewer' || userRole === 'developer') return true;
             return !m.is_internal;
         });
 
@@ -262,7 +307,7 @@ export async function getRequestById(id: string, currentUserId?: string, userRol
 
     const rMessages = messages.filter(m => m.request_id === id);
     const visibleMessages = rMessages.filter(m => {
-        if (userRole === 'admin' || userRole === 'reviewer') return true;
+        if (userRole === 'admin' || userRole === 'reviewer' || userRole === 'developer') return true;
         return !m.is_internal;
     });
 
@@ -441,8 +486,11 @@ export async function sendMessage(requestId: string, userId: string, text: strin
 
 export async function getReviewers() {
     return [
-        { id: "rev-1", email: "reviewer1@dummy.com" },
-        { id: "rev-2", email: "reviewer2@dummy.com" }
+        { id: "rev-1", email: "reviewer1@dummy.com", role: 'reviewer' },
+        { id: "rev-2", email: "reviewer2@dummy.com", role: 'reviewer' },
+        { id: "dev-1", email: "developer1@dummy.com", role: 'developer' },
+        { id: "dev-2", email: "developer2@dummy.com", role: 'developer' },
+        { id: "dev-3", email: "developer3@dummy.com", role: 'developer' }
     ];
 }
 
@@ -484,7 +532,30 @@ export async function addPeerReviewer(requestId: string, itemId: string, reviewe
                     decision: null,
                     updated_at: null
                 });
+                // Auto-update status to Peer Review if it's in a lower state
+                if (['New', 'In Progress', 'Info Needed'].includes(items[iIndex].status)) {
+                    items[iIndex].status = 'Peer Review';
+                }
                 addAuditEntry(requests[rIndex], 'Admin', `Added Peer Reviewer to Item #${items[iIndex].item_number}`, 'None', reviewer.email);
+                setStored(REQUESTS_KEY, requests);
+            }
+        }
+    }
+}
+
+export async function removePeerReviewer(requestId: string, itemId: string, userId: string) {
+    const requests = getStored<Request[]>(REQUESTS_KEY, initialRequests);
+    const rIndex = requests.findIndex(r => r.id === requestId);
+    if (rIndex !== -1) {
+        const items = requests[rIndex].items || [];
+        const iIndex = items.findIndex(i => i.id === itemId);
+        if (iIndex !== -1) {
+            const current = items[iIndex].peer_reviewers || [];
+            const rIdx = current.findIndex(r => r.user_id === userId);
+            if (rIdx !== -1) {
+                const removed = current[rIdx];
+                items[iIndex].peer_reviewers.splice(rIdx, 1);
+                addAuditEntry(requests[rIndex], 'Admin', `Removed Peer Reviewer from Item #${items[iIndex].item_number}`, removed.email, 'None');
                 setStored(REQUESTS_KEY, requests);
             }
         }
@@ -526,3 +597,12 @@ export async function bulkAssignRequests(requestIds: string[], reviewerId: strin
 export async function markRequestAsRead(requestId: string, userId: string) {
     // No-op for dummy
 }
+
+export const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
