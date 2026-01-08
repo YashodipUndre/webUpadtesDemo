@@ -31,6 +31,7 @@ const List = LucideIcons.List || LucideIcons.HelpCircle;
 const ListOrdered = LucideIcons.ListOrdered || LucideIcons.HelpCircle;
 const Quote = LucideIcons.Quote || LucideIcons.HelpCircle;
 const Code = LucideIcons.Code || LucideIcons.HelpCircle;
+const Code2 = LucideIcons.Code2 || LucideIcons.HelpCircle;
 const Type = LucideIcons.Type || LucideIcons.HelpCircle;
 const Smile = LucideIcons.Smile || LucideIcons.HelpCircle;
 const AtSign = LucideIcons.AtSign || LucideIcons.HelpCircle;
@@ -457,6 +458,34 @@ const initialRequests: Request[] = [
                 created_at: new Date().toISOString()
             }
         ]
+    },
+    {
+        id: "3",
+        title: "Implement API Integration for Newsletter",
+        client_id: "client-3",
+        status: "In Progress",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
+        profiles: { email: "tech@startupschool.edu", school: "Startup School" },
+        items: [
+            {
+                id: "item-3",
+                request_id: "3",
+                item_number: 1,
+                categories: ['Text', 'Defect'],
+                description: "Connect the newsletter signup form to Mailchimp API",
+                page_url: "https://startupschool.edu/newsletter",
+                details: {},
+                status: "In Progress",
+                assigned_to: "developer1@dummy.com",
+                reviewer_id: "dev-1", // Assigned to Developer 1
+                estimated_effort: 4,
+                due_date: new Date(Date.now() + 172800000).toISOString(),
+                peer_reviewers: [],
+                created_at: new Date(Date.now() - 43200000).toISOString()
+            }
+        ]
     }
 ];
 
@@ -815,6 +844,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         const stored = localStorage.getItem(SESSION_KEY);
         if (stored) {
             const data = JSON.parse(stored);
+
+            // Fix: Enforce correct IDs for known test accounts on hydration
+            // This prevents the 'random ID' issue if the session was stored with a random ID previously
+            if (data.email === 'developer1@dummy.com') data.id = 'dev-1';
+            else if (data.email === 'developer2@dummy.com') data.id = 'dev-2';
+            else if (data.email === 'developer3@dummy.com') data.id = 'dev-3';
+
             setUser(data);
         }
         setIsLoading(false);
@@ -833,9 +869,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = async (email: string, role: Role) => {
         // In a dummy app, we just accept whatever the user picks on the UI
         let id = "dummy-id-" + Date.now();
+
+        // Assign Valid IDs for Logic
         if (email === 'reviewer1@dummy.com') id = 'rev-1';
         else if (email === 'reviewer2@dummy.com') id = 'rev-2';
         else if (email === 'admin@dummy.com') id = 'admin-1';
+        else if (email === 'developer1@dummy.com') id = 'dev-1';
+        else if (email === 'developer2@dummy.com') id = 'dev-2';
+        else if (email === 'developer3@dummy.com') id = 'dev-3';
 
         const dummyUser: LocalUser = {
             id,
@@ -1088,7 +1129,8 @@ function Navbar() {
         { href: "/requests/new", label: "New Ticket", show: role === "client" },
         { href: "/admin", label: "Overview", show: role === "admin" },
         { href: "/admin/reports", label: "Reports", show: role === "admin" },
-        { href: "/reviewer", label: "Reviews", show: role === "reviewer" },
+        { href: "/reviewer", label: "Review Queue", show: role === "reviewer" },
+        { href: "/developer", label: "Dev Queue", show: role === "developer" },
     ].filter(link => link.show);
 
     return (
@@ -1432,40 +1474,56 @@ function TicketItemCard({ item, children }: TicketItemCardProps) {
     return (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden hover:shadow-2xl hover:shadow-yellow-100/20 transition-all duration-300">
             {/* Header / ID Bar */}
-            <div className="px-6 py-5 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-100 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <span className="mt-1 w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-stone-900 font-black text-sm shadow-md shadow-yellow-200 flex-shrink-0">
-                        #{item.item_number}
-                    </span>
-                    <div className="flex flex-col min-w-0 flex-1">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            {item.categories?.map((cat, idx) => {
+            <div className={`px-5 py-4 bg-white transition-colors duration-300 ${selectedCat ? 'bg-slate-50/50' : ''} ${!selectedCat ? 'rounded-b-2xl' : 'border-b border-slate-100'}`}>
+                <div className="flex gap-4">
+                    {/* Left: ID Badge */}
+                    <div className="flex-shrink-0 pt-0.5">
+                        <span className="w-9 h-9 rounded-lg bg-yellow-400 text-stone-900 flex items-center justify-center font-black text-xs shadow-sm shadow-yellow-200">
+                            #{item.item_number}
+                        </span>
+                    </div>
+
+                    {/* Middle: Content */}
+                    <div className="flex-1 min-w-0 space-y-3">
+                        {/* Top: Description & Status */}
+                        <div className="flex items-start justify-between gap-4">
+                            <h4 className="text-sm font-bold text-slate-800 leading-snug line-clamp-2 pt-0.5" title={item.description}>
+                                {item.description}
+                            </h4>
+                            <div className="flex-shrink-0">
+                                <StatusBadge status={item.status} />
+                            </div>
+                        </div>
+
+                        {/* Bottom: Inline Scrollable Category Tabs */}
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -ml-1 pl-1">
+                            {item.categories?.map(cat => {
                                 const isActive = selectedCat === cat;
                                 return (
                                     <button
-                                        key={idx}
-                                        onClick={() => setSelectedCat(isActive ? null : cat as string)}
-                                        className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all border shadow-sm ${isActive
-                                            ? "bg-stone-900 border-stone-900 text-white transform scale-105"
-                                            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300"
-                                            }`}
+                                        key={cat}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedCat(isActive ? null : cat as string);
+                                        }}
+                                        className={`
+                                            flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border
+                                            ${isActive
+                                                ? 'bg-slate-800 text-white border-slate-800 shadow-md shadow-slate-200 transform scale-105'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'}
+                                        `}
                                     >
+                                        <div className="w-3 h-3 flex items-center justify-center">#</div>
                                         {cat}
                                     </button>
                                 );
-                            }) ?? (
-                                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 border border-slate-200">
-                                        Uncategorized
-                                    </span>
-                                )}
+                            })}
+
+                            {(!item.categories || item.categories.length === 0) && (
+                                <span className="text-[10px] text-slate-400 italic px-2">No categories</span>
+                            )}
                         </div>
-                        <h4 className="text-base font-black text-slate-800 leading-snug line-clamp-2 pr-4" title={item.description}>
-                            {item.description}
-                        </h4>
                     </div>
-                </div>
-                <div className="mt-1 flex-shrink-0">
-                    <StatusBadge status={item.status} />
                 </div>
             </div>
 
@@ -5268,6 +5326,256 @@ function ReviewerRequestDetail() {
     );
 }
 
+// --- SOURCE: src/app/developer/page.tsx ---
+
+function DeveloperDashboardPage() {
+    return (
+        <ProtectedRoute allow={["developer"]}>
+            <DeveloperDashboard />
+        </ProtectedRoute>
+    );
+}
+
+function DeveloperDashboard() {
+    const { user } = useAuth();
+    const router = useRouter();
+    const [requests, setRequests] = useState<Request[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            async function fetchRequests() {
+                try {
+                    // Fetch generic requests logic, but we will filter clientside
+                    // Ideally API would handle this, but for mock data we fetch all or based on mock logic
+                    // The 'developer' role fetch in mock data roughly returns everything or specific set
+                    const data = await getRequests(user?.id, 'developer');
+                    setRequests(data);
+                } catch (err: any) {
+                    setError(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+            if (user?.id) fetchRequests();
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, [user?.id]);
+
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterStatus, setFilterStatus] = useState("All");
+
+    // Filter to ONLY items assigned to this specific developer
+    // "Private Queue" logic
+    const filtered = requests.filter((r) => {
+        // Must have at least one item assigned to me
+        // OR the request itself is assigned to me (if that logic existed, but usually it's items)
+        // Data.ts mock often puts reviewer_id on Request for simplicity, or on items.
+        // We check items first.
+        const isAssignedToMe = r.items?.some(item => item.reviewer_id === user?.id) || r.reviewer_id === user?.id;
+
+        if (!isAssignedToMe) return false;
+
+        const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.id.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = filterStatus === "All" || r.status === filterStatus;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    const [page, setPage] = useState(1);
+
+    // Reset items page when filtering
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, filterStatus]);
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[50vh]">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 py-4">
+            <header className="space-y-2">
+                <div className="flex items-center gap-2 mb-1.5">
+                    <span className="px-2.5 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100 italic">
+                        Dev Queue
+                    </span>
+                </div>
+                <h1 className="text-3xl font-black tracking-tight text-slate-900">My Tasks</h1>
+                <p className="text-slate-500 font-medium max-w-2xl text-sm">
+                    Access and manage development tickets specifically assigned to your workload.
+                </p>
+            </header>
+
+            {error && (
+                <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-xs font-bold animate-in fade-in">
+                    System Error: {error}
+                </div>
+            )}
+
+            <div className="card-premium p-6 bg-white rounded-[2.5rem] border-slate-200 shadow-xl shadow-blue-100/20">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <Code2 className="w-5 h-5 text-blue-500" />
+                        Assigned Tasks
+                        <span className="ml-1 px-2.5 py-1 bg-blue-500 text-white rounded-full text-[11px] font-black shadow-md shadow-blue-200">
+                            {filtered.length}
+                        </span>
+                    </h3>
+
+                    <div className="flex flex-col sm:flex-row gap-3 flex-1 max-w-2xl justify-end">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search by ID or Title..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-blue-400/10 focus:border-blue-400 transition-all outline-none group-hover:border-slate-300"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full transition-colors"
+                                >
+                                    <X className="w-3 h-3 text-slate-500" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                            {['All', 'In Progress', 'Peer Review', 'Complete'].map((status) => (
+                                <button
+                                    key={status}
+                                    onClick={() => setFilterStatus(status)}
+                                    className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${filterStatus === status
+                                        ? "bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-200"
+                                        : "bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600"
+                                        }`}
+                                >
+                                    {status}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {filtered.length === 0 ? (
+                    <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
+                        <div className="w-20 h-20 bg-white shadow-xl shadow-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-5 transform -rotate-6">
+                            <Code2 className="w-10 h-10 text-blue-400" />
+                        </div>
+                        <h4 className="text-slate-900 font-bold text-base mb-1">No Assigned Tasks</h4>
+                        <p className="text-slate-400 font-medium text-sm">You have no tickets currently assigned to your queue.</p>
+                        {(searchQuery || filterStatus !== "All") && (
+                            <button
+                                onClick={() => { setSearchQuery(""); setFilterStatus("All"); }}
+                                className="mt-4 px-6 py-2 bg-blue-500 text-white font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-blue-600 transition-colors shadow-lg shadow-blue-200"
+                            >
+                                Reset All Filters
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full table-auto min-w-[900px]">
+                                <thead>
+                                    <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
+                                        <th className="px-6 py-5">Task</th>
+                                        <th className="px-6 py-5">Received</th>
+                                        <th className="px-6 py-5">Status</th>
+                                        <th className="px-6 py-5">Priority</th>
+                                        <th className="px-6 py-5 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((r) => (
+                                        <tr
+                                            key={r.id}
+                                            className={`hover:bg-slate-50/80 transition-all group ${r.urgency === "Urgent" ? "bg-red-50/30" : ""}`}
+                                        >
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xs">
+                                                        #{r.id.slice(0, 4)}
+                                                    </span>
+                                                    <div>
+                                                        <p className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{r.title}</p>
+                                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">
+                                                            {r.profiles?.email}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className="text-xs font-bold text-slate-600">
+                                                    {new Date(r.created_at).toLocaleDateString()}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <StatusBadge status={r.status} />
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${r.urgency === "Urgent"
+                                                    ? "bg-rose-50 text-rose-600 border-rose-100"
+                                                    : "bg-slate-50 text-slate-400 border-slate-100"
+                                                    }`}>
+                                                    {r.urgency}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-5 text-right">
+                                                <button
+                                                    onClick={() => router.push(`/reviewer/requests/${r.id}`)}
+                                                    className="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-600 hover:bg-blue-50 transition-all shadow-sm"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+            {/* Pagination Controls */}
+            {filtered.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100 bg-white rounded-xl border border-slate-200">
+                    <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                    >
+                        Previous
+                    </button>
+                    <span className="text-xs font-bold text-slate-400">
+                        Page {page} of {Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                    </span>
+                    <button
+                        onClick={() => setPage(p => Math.min(Math.ceil(filtered.length / ITEMS_PER_PAGE), p + 1))}
+                        disabled={page >= Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                        className="px-4 py-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+
 
 function MainApp() {
     const [path, setPath] = useState("/");
@@ -5301,6 +5609,7 @@ function MainApp() {
                     {displayPath === "/admin/requests/[id]" && <AdminDetailPage />}
                     {displayPath === "/reviewer" && <ReviewerDashboardPage />}
                     {displayPath === "/reviewer/requests/[id]" && <ReviewerDetailPage />}
+                    {displayPath === "/developer" && <DeveloperDashboardPage />}
                 </LayoutShell>
             </AuthProvider>
         </RouterContext.Provider>
