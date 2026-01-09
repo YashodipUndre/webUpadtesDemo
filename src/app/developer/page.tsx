@@ -44,12 +44,13 @@ function DeveloperDashboard() {
         return () => clearTimeout(timer);
     }, [user?.id]);
 
-    // Filter requests that have at least one item assigned to this developer OR the whole request is assigned
+    // Show ALL requests to ANY developer, regardless of specific assignment
     const filtered = requests.filter((r) => {
-        const isGloballyAssigned = r.reviewer_id === user?.id;
-        const hasAssignedItem = r.items?.some(item => item.reviewer_id === user?.id);
+        // Shared Queue (Assigned Only): Show request to ALL developers, BUT only if it has been assigned to *someone*.
+        // Unassigned requests remain hidden until Admin assigns them.
+        const isAssignedToSomeone = r.items?.some(item => !!item.reviewer_id);
 
-        if (!isGloballyAssigned && !hasAssignedItem) return false;
+        if (!isAssignedToSomeone) return false;
 
         const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             r.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -139,7 +140,7 @@ function DeveloperDashboard() {
                         <p className="text-slate-400 font-medium text-sm">No active implementation tasks assigned to you.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto h-[400px] overflow-y-auto scrollbar-hide">
                         <table className="w-full table-auto min-w-[900px]">
                             <thead>
                                 <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
@@ -153,13 +154,13 @@ function DeveloperDashboard() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((r) => {
+                                {filtered.map((r) => {
                                     const createdDate = new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
                                     return (
                                         <tr
                                             key={r.id}
-                                            onClick={() => router.push(`/reviewer/requests/${r.id}`)}
+                                            onClick={() => router.push(`/developer/requests/${r.id}`)}
                                             className={`hover:bg-slate-50/80 transition-all group cursor-pointer ${r.urgency === 'Urgent' ? 'bg-red-50/20' : ''}`}
                                         >
                                             <td className="px-6 py-5">
@@ -205,8 +206,8 @@ function DeveloperDashboard() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-5 text-right">
-                                                <div className="w-9 h-9 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 group-hover:text-yellow-600 group-hover:border-yellow-600 group-hover:bg-yellow-50 transition-all shadow-sm">
-                                                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
+                                                <div className="inline-flex items-center justify-center text-slate-300 group-hover:text-yellow-600 transition-colors">
+                                                    <ArrowRight className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" />
                                                 </div>
                                             </td>
                                         </tr>
@@ -214,31 +215,6 @@ function DeveloperDashboard() {
                                 })}
                             </tbody>
                         </table>
-
-                        {/* Pagination Controls */}
-                        {filtered.length > ITEMS_PER_PAGE && (
-                            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100">
-                                <button
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                    className="px-5 py-2 text-[11px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-                                >
-                                    Previous
-                                </button>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Page</span>
-                                    <span className="px-3 py-1 bg-yellow-500 text-stone-900 rounded-lg text-xs font-black shadow-sm shadow-yellow-100">{page}</span>
-                                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">of {Math.ceil(filtered.length / ITEMS_PER_PAGE)}</span>
-                                </div>
-                                <button
-                                    onClick={() => setPage(p => Math.min(Math.ceil(filtered.length / ITEMS_PER_PAGE), p + 1))}
-                                    disabled={page >= Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-                                    className="px-5 py-2 text-[11px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

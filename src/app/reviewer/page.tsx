@@ -44,18 +44,16 @@ function ReviewerDashboard() {
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState("All");
 
-    // Filter by whether any item has this user as a peer reviewer OR Assigned Developer OR Peer Review status on the ticket itself
+    // SHARED QUEUE: Show requests if ANY item has ANY peer reviewer assigned
+    // All peer reviewers see the same list of requests that have review assignments
     const filtered = requests.filter((r) => {
-        // Check if user is assigned as a peer reviewer on any item
-        const isPeerReviewer = r.items?.some(item => item.peer_reviewers?.some(pr => pr.user_id === user?.id));
+        // Check if any item has a peer reviewer assigned (any reviewer, not just current user)
+        const hasAnyPeerReviewer = r.items?.some(item =>
+            item.peer_reviewers && item.peer_reviewers.length > 0
+        );
 
-        // Check if user is assigned as a developer (reviewer) on any item
-        const isAssignedDeveloper = r.items?.some(item => item.reviewer_id === user?.id);
-
-        // Eligible if they are a peer reviewer, an assigned developer, or the ticket is globally in Peer Review status (legacy behavior, can be refined)
-        const isEligible = isPeerReviewer || isAssignedDeveloper || r.status === 'Peer Review';
-
-        if (!isEligible) return false;
+        // Eligible if the request has any peer reviewer assignments
+        if (!hasAnyPeerReviewer) return false;
 
         const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             r.id.toLowerCase().includes(searchQuery.toLowerCase());

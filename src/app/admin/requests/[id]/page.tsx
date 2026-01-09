@@ -82,6 +82,9 @@ function AdminRequestDetail() {
         if (!user || !request) return;
         try {
             await updateItemEffortAndDate(request.id, itemId, effort, dueDate, user.email || 'Admin');
+            // Refresh state so spinner buttons work immediately
+            const updated = await getRequestById(id, user.id, 'admin');
+            setRequest(updated);
         } catch (err: any) {
             alert("Error: " + err.message);
         }
@@ -724,7 +727,7 @@ function AdminRequestDetail() {
                                                     className="w-full p-2 bg-slate-100 border-dashed border-2 border-slate-200 rounded-lg text-[10px] font-bold text-slate-400 hover:border-slate-300 transition-all cursor-pointer disabled:cursor-not-allowed disabled:hover:border-slate-200"
                                                 >
                                                     <option value="">+ Assign Reviewer</option>
-                                                    {reviewers.filter(r => !item.peer_reviewers?.find(p => p.user_id === r.id)).map(r => (
+                                                    {reviewers.filter(r => !item.peer_reviewers?.find(p => p.user_id === r.id) && (r as any).role === 'reviewer').map(r => (
                                                         <option key={r.id} value={r.id}>{r.email}</option>
                                                     ))}
                                                 </select>

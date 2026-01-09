@@ -52,8 +52,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const signup = async (email: string, role: Role) => {
+        let id = Math.random().toString(36).substr(2, 9);
+
+        // Enforce known IDs for test accounts so they match the static list in data.ts
+        if (email === 'developer1@dummy.com') id = 'dev-1';
+        else if (email === 'developer2@dummy.com') id = 'dev-2';
+        else if (email === 'developer3@dummy.com') id = 'dev-3';
+        else if (email === 'reviewer1@dummy.com') id = 'rev-1';
+        else if (email === 'reviewer2@dummy.com') id = 'rev-2';
+        else if (email === 'admin@dummy.com') id = 'admin-1';
+
         const newUser: LocalUser = {
-            id: Math.random().toString(36).substr(2, 9),
+            id,
             email,
             role
         };

@@ -404,8 +404,49 @@ export async function updateItemStatus(requestId: string, itemId: string, status
             const prev = item.status;
             item.status = status;
             addAuditEntry(requests[rIndex], userEmail, `Changed Item #${item.item_number} Status`, prev, status);
+
+            // AUTO-COMPLETE: If all items are now Complete, automatically complete the ticket
+            const allItems = requests[rIndex].items!;
+            const allComplete = allItems.length > 0 && allItems.every(i => i.status === 'Complete');
+
+            if (allComplete && requests[rIndex].status !== 'Complete') {
+                const prevTicketStatus = requests[rIndex].status;
+                requests[rIndex].status = 'Complete';
+                addAuditEntry(requests[rIndex], 'System', 'Auto-completed ticket (all items complete)', prevTicketStatus, 'Complete');
+            }
+
             setStored(REQUESTS_KEY, requests);
         }
+    }
+}
+
+// Batch update multiple items - ensures auto-complete check runs after ALL items are updated
+export async function updateMultipleItemStatuses(requestId: string, itemIds: string[], status: string, userEmail: string = 'System') {
+    const requests = getStored<Request[]>(REQUESTS_KEY, initialRequests);
+    const rIndex = requests.findIndex(r => r.id === requestId);
+    if (rIndex !== -1 && requests[rIndex].items) {
+        // Update all specified items
+        for (const itemId of itemIds) {
+            const iIndex = requests[rIndex].items!.findIndex(i => i.id === itemId);
+            if (iIndex !== -1) {
+                const item = requests[rIndex].items![iIndex];
+                const prev = item.status;
+                item.status = status;
+                addAuditEntry(requests[rIndex], userEmail, `Changed Item #${item.item_number} Status`, prev, status);
+            }
+        }
+
+        // AUTO-COMPLETE: Check if all items are now Complete
+        const allItems = requests[rIndex].items!;
+        const allComplete = allItems.length > 0 && allItems.every(i => i.status === 'Complete');
+
+        if (allComplete && requests[rIndex].status !== 'Complete') {
+            const prevTicketStatus = requests[rIndex].status;
+            requests[rIndex].status = 'Complete';
+            addAuditEntry(requests[rIndex], 'System', 'Auto-completed ticket (all items complete)', prevTicketStatus, 'Complete');
+        }
+
+        setStored(REQUESTS_KEY, requests);
     }
 }
 

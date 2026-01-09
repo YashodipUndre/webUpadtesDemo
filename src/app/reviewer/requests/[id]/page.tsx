@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { getRequestById, updateRequestStatus, sendMessage, Request, updateItemStatus, Attachment, submitPeerReviewDecision, ITEM_STATUSES, RESPONSE_TEMPLATES, updateItemEffortAndDate, getReviewers, assignItem, fileToBase64 } from "@/lib/data";
+import { getRequestById, updateRequestStatus, sendMessage, Request, updateItemStatus, updateMultipleItemStatuses, Attachment, submitPeerReviewDecision, ITEM_STATUSES, RESPONSE_TEMPLATES, updateItemEffortAndDate, getReviewers, assignItem, fileToBase64 } from "@/lib/data";
+import { RequestTimeline } from "@/components/RequestTimeline";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TicketItemCard } from "@/components/TicketItemCard";
 import { useAuth } from "@/lib/auth-context";
@@ -13,7 +14,7 @@ import { Search, ChevronDown, User, Calendar, Clock, Link as LinkIcon, FileText,
 
 export default function ReviewerRequestDetailPage() {
     return (
-        <ProtectedRoute allow={["reviewer", "developer"]}>
+        <ProtectedRoute allow={["reviewer"]}>
             <ReviewerRequestDetail />
         </ProtectedRoute>
     );
@@ -38,6 +39,7 @@ function ReviewerRequestDetail() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
     const [itemSearchQuery, setItemSearchQuery] = useState("");
+    const [showAllAudit, setShowAllAudit] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -57,22 +59,6 @@ function ReviewerRequestDetail() {
         }, 2000);
         return () => clearTimeout(timer);
     }, [id]);
-
-    const handleDeveloperStatus = async (itemId: string, newStatus: string) => {
-        if (!request || !user) return;
-        setIsUpdating(true);
-        try {
-            await updateItemStatus(request.id, itemId, newStatus, user.email || 'Developer');
-            await sendMessage(request.id, user.id, `Item #${request.items?.find(i => i.id === itemId)?.item_number} marked as ${newStatus}`, true, undefined, 'reviewer', user.email || 'Developer');
-
-            const updated = await getRequestById(id, user.id, 'reviewer');
-            setRequest(updated);
-        } catch (err: any) {
-            alert("Error: " + err.message);
-        } finally {
-            setIsUpdating(false);
-        }
-    };
 
     async function handleReviewAction(action: 'approve' | 'request_changes') {
         if (!request || !user) return;
@@ -95,21 +81,35 @@ function ReviewerRequestDetail() {
         }
     }
 
-    async function confirmComplete(isUrgent: boolean = false) {
+    async function confirmComplete() {
         if (!request || !user) return;
         setIsUpdating(true);
         try {
-            const newStatus = "Complete";
-            await updateRequestStatus(request.id, newStatus, user.email || 'Reviewer');
-            const message = isUrgent
-                ? "Developer marked ticket as COMPLETED (URGENT - Peer review to follow)."
-                : "Developer marked ticket as COMPLETED.";
+            // First, mark all items that have peer reviewers as Complete
+            const itemsWithReviewers = request.items?.filter(item =>
+                item.peer_reviewers && item.peer_reviewers.length > 0
+            ) || [];
+
+            if (itemsWithReviewers.length === 0) {
+                alert("No items with peer reviewers to mark as complete.");
+                setIsUpdating(false);
+                setShowCompleteConfirm(false);
+                return;
+            }
+
+            // Use batch update to ensure all items are updated before auto-complete check
+            const itemIds = itemsWithReviewers.map(item => item.id);
+            await updateMultipleItemStatuses(request.id, itemIds, 'Complete', user.email || 'Reviewer');
+
+            // Do NOT change global ticket status - only item statuses are updated
+            const message = `Peer Reviewer approved ${itemsWithReviewers.length} item(s) and marked them as COMPLETE.`;
+
             await sendMessage(request.id, user.id, message, false, undefined, 'reviewer', user.email || 'Reviewer');
             const updated = await getRequestById(id, user.id, role || 'reviewer');
             setRequest(updated);
             setShowCompleteConfirm(false);
-            alert("Ticket marked as Complete");
-            router.push(role === 'developer' ? "/developer" : "/reviewer");
+            alert(`${itemsWithReviewers.length} item(s) marked as Complete.`);
+            router.push("/reviewer");
         } catch (err: any) {
             alert("Error: " + err.message);
         } finally {
@@ -117,35 +117,12 @@ function ReviewerRequestDetail() {
         }
     }
 
-    const handleItemReassignment = async (itemId: string, reviewerId: string | null) => {
-        if (!request || !user) return;
-        setIsUpdating(true);
-        try {
-            await assignItem(request.id, itemId, reviewerId, user.email || 'Developer');
-            const updated = await getRequestById(id, user.id, role || 'reviewer');
-            setRequest(updated);
-        } catch (err: any) {
-            alert("Error: " + err.message);
-        } finally {
-            setIsUpdating(false);
-        }
-    };
+    async function initiateClientMessage() {
+        if ((!clientMessage.trim() && !clientAttachment) || !user || !request) return;
+        setShowConfirm(true);
+    }
 
-    const handleItemEffortDate = async (itemId: string, effort: number, dueDate: string | null) => {
-        if (!request || !user) return;
-        setIsUpdating(true);
-        try {
-            await updateItemEffortAndDate(request.id, itemId, effort, dueDate, user.email || 'Developer');
-            const updated = await getRequestById(id, user.id, role || 'reviewer');
-            setRequest(updated);
-        } catch (err: any) {
-            alert("Error: " + err.message);
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-
-    async function sendMessageToClient() {
+    async function confirmSendMessage() {
         if ((!clientMessage.trim() && !clientAttachment) || !user || !request) return;
         setIsUpdating(true);
         try {
@@ -194,8 +171,8 @@ function ReviewerRequestDetail() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex-shrink-0">
                     <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
                         <span className="text-yellow-600">Review Board:</span> {request.title}
                     </h1>
@@ -203,7 +180,13 @@ function ReviewerRequestDetail() {
                         Client: {request.profiles?.email} • Created: {new Date(request.created_at).toLocaleDateString()}
                     </p>
                 </div>
-                <div className="text-right">
+
+                {/* Timeline - Centered */}
+                <div className="flex-1 max-w-xl">
+                    <RequestTimeline request={request} />
+                </div>
+
+                <div className="text-right flex-shrink-0">
                     <StatusBadge status={request.status} />
                 </div>
             </div>
@@ -392,7 +375,7 @@ function ReviewerRequestDetail() {
                                             }
                                             trailingActions={
                                                 <button
-                                                    onClick={sendMessageToClient}
+                                                    onClick={initiateClientMessage}
                                                     disabled={isUpdating || (!clientMessage.trim() && !clientAttachment)}
                                                     className="px-4 py-2 bg-yellow-400 text-stone-900 text-xs font-black uppercase tracking-wider rounded-lg hover:bg-yellow-500 disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 transition-all shadow-sm active:scale-95 flex items-center gap-2"
                                                 >
@@ -502,20 +485,6 @@ function ReviewerRequestDetail() {
                                     </div>
                                 </div>
                             </button>
-
-                            {/* Urgent Submission */}
-                            <button
-                                onClick={() => confirmComplete(true)} // Urgent skip
-                                disabled={isUpdating}
-                                className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl p-3 transition-all duration-300 shadow-md shadow-rose-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <div className="relative z-10 flex items-center justify-center gap-2">
-                                    <div className="p-1.5 bg-white/20 rounded-full animate-pulse">
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Super Urgent Submission</span>
-                                </div>
-                            </button>
                         </div>
                     </div>
 
@@ -540,80 +509,6 @@ function ReviewerRequestDetail() {
                             ).map(item => (
                                 <TicketItemCard key={item.id} item={item}>
                                     <div className="pt-3 border-t border-slate-200">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                            {/* Status Lifecycle */}
-                                            <div className="group/field">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
-                                                    <Clock className="w-2.5 h-2.5" />
-                                                    Item Lifecycle
-                                                </label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={item.status}
-                                                        onChange={(e) => handleDeveloperStatus(item.id, e.target.value)}
-                                                        disabled={isUpdating}
-                                                        className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none appearance-none cursor-pointer"
-                                                    >
-                                                        {ITEM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                                    </select>
-                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                                                </div>
-                                            </div>
-
-                                            {/* Reassignment */}
-                                            <div className="group/field">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
-                                                    <User className="w-2.5 h-2.5" />
-                                                    Assign Developer
-                                                </label>
-                                                <div className="relative">
-                                                    <select
-                                                        value={item.reviewer_id || ""}
-                                                        onChange={(e) => handleItemReassignment(item.id, e.target.value || null)}
-                                                        disabled={isUpdating}
-                                                        className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none appearance-none cursor-pointer"
-                                                    >
-                                                        <option value="">Unassigned</option>
-                                                        {reviewers.filter(r => (r as any).role === 'developer').map(rev => (
-                                                            <option key={rev.id} value={rev.id}>{rev.email} ({(rev as any).role})</option>
-                                                        ))}
-                                                    </select>
-                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Planning Columns */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                            <div className="group/field">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
-                                                    <Clock className="w-2.5 h-2.5" />
-                                                    Effort (Hours)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={item.estimated_effort}
-                                                    onChange={(e) => handleItemEffortDate(item.id, parseInt(e.target.value) || 0, item.due_date)}
-                                                    disabled={isUpdating}
-                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none"
-                                                />
-                                            </div>
-                                            <div className="group/field">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1.5 flex items-center gap-1">
-                                                    <Calendar className="w-2.5 h-2.5" />
-                                                    Internal Due Date
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={item.due_date || ""}
-                                                    onChange={(e) => handleItemEffortDate(item.id, item.estimated_effort, e.target.value || null)}
-                                                    disabled={isUpdating}
-                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-yellow-400/10 focus:border-yellow-400 transition-all outline-none"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Technical Information Visibility */}
                                         <div className="space-y-3 bg-slate-50/50 p-3 rounded-xl border border-dashed border-slate-200">
                                             <div className="flex items-center gap-2">
                                                 <LinkIcon className="w-3 h-3 text-slate-400" />
@@ -710,7 +605,74 @@ function ReviewerRequestDetail() {
                 </aside>
             </div>
 
+            {/* AUDIT LOG SECTION */}
+            <section className="mt-8 bg-white p-6 rounded-[2rem] border border-slate-200/60 shadow-xl shadow-slate-100">
+                <div className="flex items-center gap-2 mb-6 border-b border-slate-50 pb-4">
+                    <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                    </div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">Operational Audit Trail</h3>
+                </div>
+
+                <div className="space-y-4">
+                    {(() => {
+                        const logs = request.audit_logs?.slice().reverse() || [];
+                        const visibleLogs = showAllAudit ? logs : logs.slice(0, 5);
+
+                        return (
+                            <>
+                                {visibleLogs.map((log: any) => (
+                                    <div key={log.id} className="flex gap-4 group">
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1.5 shadow-sm shadow-yellow-200" />
+                                            <div className="w-px h-full bg-slate-100 flex-1 my-1" />
+                                        </div>
+                                        <div className="flex-1 pb-4">
+                                            <div className="flex flex-wrap items-baseline gap-2 mb-1">
+                                                <span className="text-xs font-black text-slate-800">{log.action}</span>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">by {log.user_email}</span>
+                                                <span className="text-[10px] font-bold text-slate-300 ml-auto">{new Date(log.created_at).toLocaleString()}</span>
+                                            </div>
+                                            {(log.previous_value || log.new_value) && (
+                                                <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
+                                                    <span className="px-1.5 py-0.5 bg-slate-50 rounded border border-slate-100 italic">{log.previous_value || 'Initial'}</span>
+                                                    <svg className="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                                    <span className="px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded border border-yellow-100 font-bold">{log.new_value}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {logs.length > 5 && (
+                                    <button
+                                        onClick={() => setShowAllAudit(!showAllAudit)}
+                                        className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center gap-2 border-t border-slate-50 mt-2"
+                                    >
+                                        {showAllAudit ? 'Show Less' : `View ${logs.length - 5} More Entries`}
+                                        <svg className={`w-3 h-3 transition-transform ${showAllAudit ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </>
+                        );
+                    })()}
+                    {(!request.audit_logs || request.audit_logs.length === 0) && (
+                        <p className="text-xs text-slate-400 italic text-center py-4">No audit history found for this request.</p>
+                    )}
+                </div>
+            </section>
+
             {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showConfirm}
+                onClose={() => setShowConfirm(false)}
+                onConfirm={confirmSendMessage}
+                title="MESSAGE CLIENT?"
+                message="This message will be visible to the client immediately. Are you sure you want to send?"
+                confirmText="YES, SEND"
+            />
 
             {/* Confirmation Modal for Complete */}
             <ConfirmationModal
