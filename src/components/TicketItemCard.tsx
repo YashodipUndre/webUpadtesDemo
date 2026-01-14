@@ -2,18 +2,22 @@ import React, { useState } from 'react';
 import { RequestItem, DYNAMIC_CATEGORIES, CategoryType } from '@/lib/data';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Hash, ChevronDown, Link as LinkIcon } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { cn } from "@/lib/utils";
 
 interface TicketItemCardProps {
     item: RequestItem;
     children?: React.ReactNode;
+    hideStatus?: boolean;
 }
 
-export function TicketItemCard({ item, children }: TicketItemCardProps) {
+export function TicketItemCard({ item, children, hideStatus = false }: TicketItemCardProps) {
     const [selectedCat, setSelectedCat] = useState<string | null>(null);
     const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-yellow-100/20 transition-all duration-300">
+        <Card className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-yellow-100/20 transition-all duration-300">
             {/* Header / ID Bar */}
             <div className={`px-5 py-4 bg-white transition-colors duration-300 ${selectedCat ? 'bg-slate-50/50' : ''} ${!selectedCat ? 'rounded-b-2xl' : 'border-b border-slate-100'}`}>
                 <div className="flex gap-4">
@@ -31,9 +35,11 @@ export function TicketItemCard({ item, children }: TicketItemCardProps) {
                             <h4 className="text-sm font-bold text-slate-800 leading-snug line-clamp-2 pt-0.5" title={item.description}>
                                 {item.description}
                             </h4>
-                            <div className="flex-shrink-0">
-                                <StatusBadge status={item.status} />
-                            </div>
+                            {!hideStatus && (
+                                <div className="flex-shrink-0">
+                                    <StatusBadge status={item.status} />
+                                </div>
+                            )}
                         </div>
 
                         {/* Bottom: Inline Scrollable Category Tabs */}
@@ -41,22 +47,23 @@ export function TicketItemCard({ item, children }: TicketItemCardProps) {
                             {item.categories?.map(cat => {
                                 const isActive = selectedCat === cat;
                                 return (
-                                    <button
+                                    <Button
                                         key={cat}
+                                        variant={isActive ? "default" : "outline"}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setSelectedCat(isActive ? null : cat);
                                         }}
-                                        className={`
-                                            flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border
-                                            ${isActive
-                                                ? 'bg-slate-800 text-white border-slate-800 shadow-md shadow-slate-200 transform scale-105'
-                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'}
-                                        `}
+                                        className={cn(
+                                            "flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border h-auto",
+                                            isActive
+                                                ? 'bg-slate-800 text-white border-slate-800 shadow-md shadow-slate-200 transform scale-105 hover:bg-slate-900'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'
+                                        )}
                                     >
-                                        <Hash className={`w-3 h-3 ${isActive ? 'text-yellow-400' : 'text-slate-400'}`} />
+                                        <Hash className={cn("w-3 h-3", isActive ? 'text-yellow-400' : 'text-slate-400')} />
                                         {cat}
-                                    </button>
+                                    </Button>
                                 );
                             })}
 
@@ -151,6 +158,6 @@ export function TicketItemCard({ item, children }: TicketItemCardProps) {
                     )}
                 </div>
             )}
-        </div>
+        </Card>
     );
 }

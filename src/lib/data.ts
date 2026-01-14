@@ -40,7 +40,7 @@ export const DYNAMIC_CATEGORIES: CategoryConfig[] = [
         label: 'Text Update',
         enabled: true,
         fields: [
-            { id: 'page_url', label: 'Page URL', type: 'url', required: true, placeholder: 'https://school.com/about' },
+            { id: 'page_url', label: 'Page URL', type: 'url', required: false, placeholder: 'https://school.com/about' },
             { id: 'original_text', label: 'Original Text', type: 'textarea', required: true },
             { id: 'updated_text', label: 'Updated Text', type: 'textarea', required: true }
         ]
@@ -50,7 +50,7 @@ export const DYNAMIC_CATEGORIES: CategoryConfig[] = [
         label: 'Image Update',
         enabled: true,
         fields: [
-            { id: 'page_url', label: 'Page URL', type: 'url', required: true },
+            { id: 'page_url', label: 'Page URL', type: 'url', required: false },
             { id: 'old_image_ref', label: 'Old Image Reference', type: 'text', required: true, placeholder: 'Descriptive name of the image to replace' },
             { id: 'new_image', label: 'New Image', type: 'image', required: true }
         ]
@@ -69,7 +69,7 @@ export const DYNAMIC_CATEGORIES: CategoryConfig[] = [
         label: 'Report Defect',
         enabled: true,
         fields: [
-            { id: 'page_url', label: 'Page URL', type: 'url', required: true },
+            { id: 'page_url', label: 'Page URL', type: 'url', required: false },
             { id: 'description', label: 'Description of Issue', type: 'textarea', required: true }
         ]
     }
@@ -119,11 +119,14 @@ export type PeerReviewDecision = {
 export type Request = {
     id: string;
     title: string;
+    description?: string;
+    page_url?: string;
     client_id: string;
     reviewer_id?: string | null;
     status: string;
     urgency: string;
     created_at: string;
+    start_date?: string | null;
     sla_due_date: string | null;
     profiles?: { email: string, school?: string, role?: string };
     reviewer?: { email: string };
@@ -135,7 +138,7 @@ export type Request = {
     last_viewed_at?: string;
 };
 
-const REQUESTS_KEY = "dummy_requests_v2";
+const REQUESTS_KEY = "dummy_requests_v3";
 const MESSAGES_KEY = "dummy_messages_v2";
 
 export const ITEM_STATUSES = [
@@ -171,92 +174,541 @@ function setStored<T>(key: string, val: T) {
 // Initial dummy data
 const initialRequests: Request[] = [
     {
-        id: "1",
-        title: "Update Logo on Homepage",
-        client_id: "client-1",
+        id: "REQ-2026-001",
+        title: "Critical Security Patch: Login Form",
+        description: "We noticed a potential vulnerability in the student login form. It seems to allow brute force attempts without lockout.",
+        page_url: "https://www.school.edu/login",
+        client_id: "user_123",
         status: "New",
-        urgency: "Normal",
-        created_at: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-        sla_due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
-        profiles: { email: "school@example.com", school: "Saint Mary's Academy" },
+        urgency: "Urgent",
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(), // 2 hours ago
+        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
         items: [
             {
-                id: "item-1",
-                request_id: "1",
+                id: "itm_101",
+                request_id: "REQ-2026-001",
                 item_number: 1,
-                categories: ['Image'],
-                description: "New logo is ready in high res",
-                page_url: "https://school.com",
-                trello_url: "https://trello.com/c/123",
+                categories: ["Defect"],
+                description: "Implement rate limiting on the login API endpoint.",
+                page_url: "https://www.school.edu/login",
                 details: {},
                 status: "New",
                 assigned_to: null,
                 reviewer_id: null,
+                peer_reviewers: [],
                 estimated_effort: 0,
                 due_date: null,
-                peer_reviewers: [],
-                created_at: new Date(Date.now() - 86400000).toISOString()
+                created_at: new Date(Date.now() - 3600000 * 2).toISOString()
             }
-        ]
-    },
-    {
-        id: "2",
-        title: "Fix Mobile Header Navigation",
-        client_id: "client-2",
-        status: "Peer Review",
-        urgency: "Urgent",
-        created_at: new Date().toISOString(), // Today
-        sla_due_date: new Date(Date.now() - 3600000).toISOString(),
-        profiles: { email: "corporate@example.com", school: "Global Corp High" },
-        items: [
+        ],
+        audit_logs: [
             {
-                id: "item-2",
-                request_id: "2",
-                item_number: 1,
-                categories: ['Text'],
-                description: "Menu button doesn't work on iOS",
-                page_url: "https://corporate.com",
-                details: {},
-                status: "Peer Review",
-                assigned_to: null,
-                reviewer_id: null,
-                estimated_effort: 0,
-                due_date: null,
-                peer_reviewers: [],
-                created_at: new Date().toISOString()
+                id: "log_1",
+                request_id: "REQ-2026-001",
+                user_id: "client@school.edu",
+                user_email: "client@school.edu",
+                action: "Created Request",
+                created_at: new Date(Date.now() - 3600000 * 2).toISOString()
             }
         ]
     },
     {
-        id: "3",
-        title: "Implement API Integration for Newsletter",
-        client_id: "client-3",
+        id: "REQ-2026-002",
+        title: "Summer Camp 2026 Landing Page",
+        description: "We need a new landing page for the upcoming Summer Science Camp. I've attached the brochure text and hero image.",
+        page_url: "https://www.school.edu/summer-camp",
+        client_id: "user_123",
         status: "In Progress",
         urgency: "Normal",
-        created_at: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
-        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
-        profiles: { email: "tech@startupschool.edu", school: "Startup School" },
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
+        sla_due_date: new Date(Date.now() + 86400000 * 5).toISOString(),
+        start_date: new Date(Date.now() - 86400000).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
         items: [
             {
-                id: "item-3",
-                request_id: "3",
+                id: "itm_102",
+                request_id: "REQ-2026-002",
                 item_number: 1,
-                categories: ['Text', 'Defect'],
-                description: "Connect the newsletter signup form to Mailchimp API",
-                page_url: "https://startupschool.edu/newsletter",
+                categories: ["Text"],
+                description: "Create main page content from attached brochure.",
+                page_url: "https://www.school.edu/summer-camp",
+                details: { original_text: "N/A", updated_text: "See attached document for full text." },
+                status: "In Progress",
+                assigned_to: "dev_1",
+                reviewer_id: "rev_1",
+                peer_reviewers: [],
+                estimated_effort: 4,
+                due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+            },
+            {
+                id: "itm_103",
+                request_id: "REQ-2026-002",
+                item_number: 2,
+                categories: ["Image"],
+                description: "Upload hero banner image (camping_kids.jpg).",
+                page_url: "https://www.school.edu/summer-camp",
+                details: { old_image_ref: "None", new_image: "pending_upload" },
+                status: "New",
+                assigned_to: "dev_1",
+                reviewer_id: "rev_1",
+                peer_reviewers: [],
+                estimated_effort: 1,
+                due_date: null,
+                created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_2", request_id: "REQ-2026-002", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 2).toISOString() },
+            { id: "log_3", request_id: "REQ-2026-002", user_id: "admin@dummy.com", user_email: "admin@dummy.com", action: "Updated Status to In Progress", created_at: new Date(Date.now() - 86400000).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-003",
+        title: "Faculty Bio Updates: Science Dept",
+        description: "Please update the bios for Dr. Smith and Mrs. Jones. They have new publications to add.",
+        page_url: "https://www.school.edu/faculty/science",
+        client_id: "user_123",
+        status: "Peer Review",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
+        start_date: new Date(Date.now() - 86400000 * 3).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_104",
+                request_id: "REQ-2026-003",
+                item_number: 1,
+                categories: ["Text"],
+                description: "Update Dr. Smith's bio.",
+                page_url: "https://www.school.edu/faculty/science/smith",
+                details: {},
+                status: "Peer Review",
+                assigned_to: "dev_2",
+                reviewer_id: "rev_2",
+                peer_reviewers: [],
+                estimated_effort: 1,
+                due_date: new Date(Date.now() - 3600000).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 4).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_4", request_id: "REQ-2026-003", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 4).toISOString() },
+            { id: "log_5", request_id: "REQ-2026-003", user_id: "dev_2", user_email: "developer2@dummy.com", action: "Updated Status to Peer Review", created_at: new Date(Date.now() - 3600000).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-004",
+        title: "Annual Report 2025 Publication",
+        description: "The 2025 Annual Report is ready for publication. Please upload the PDF to the reports section.",
+        page_url: "https://www.school.edu/reports",
+        client_id: "user_123",
+        status: "Complete",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
+        start_date: new Date(Date.now() - 86400000 * 9).toISOString(),
+        sla_due_date: new Date(Date.now() - 86400000 * 5).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_105",
+                request_id: "REQ-2026-004",
+                item_number: 1,
+                categories: ["Document"],
+                description: "Upload Annual_Report_2025.pdf",
+                page_url: "https://www.school.edu/reports",
+                details: {},
+                status: "Complete",
+                assigned_to: "dev_3",
+                reviewer_id: "rev_1",
+                peer_reviewers: [],
+                estimated_effort: 0.5,
+                due_date: new Date(Date.now() - 86400000 * 6).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 10).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_6", request_id: "REQ-2026-004", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 10).toISOString() },
+            { id: "log_7", request_id: "REQ-2026-004", user_id: "admin@dummy.com", user_email: "admin@dummy.com", action: "Updated Status to Complete", created_at: new Date(Date.now() - 86400000 * 5).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-005",
+        title: "New Alumni Portal Integration",
+        description: "We are launching a new portal for alumni. Need to add a 'Login' button to the top header.",
+        page_url: "https://www.school.edu/",
+        client_id: "user_123",
+        status: "Info Needed",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000 * 3).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_106",
+                request_id: "REQ-2026-005",
+                item_number: 1,
+                categories: ["Text", "Defect"],
+                description: "Add Alumni Login button to header.",
+                page_url: "https://www.school.edu/",
+                details: {},
+                status: "Info Needed",
+                assigned_to: "dev_1",
+                reviewer_id: null,
+                peer_reviewers: [],
+                estimated_effort: 0,
+                due_date: null,
+                created_at: new Date(Date.now() - 86400000 * 1).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_8", request_id: "REQ-2026-005", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 1).toISOString() },
+            { id: "log_9", request_id: "REQ-2026-005", user_id: "dev_1", user_email: "developer1@dummy.com", action: "Updated Status to Info Needed", created_at: new Date(Date.now() - 3600000 * 5).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-006",
+        title: "Fundraising Gala 2026 Page",
+        description: "Create a new page for the upcoming Fundraising Gala. Needs tickieting information and a gallery of last year's event.",
+        page_url: "https://www.school.edu/gala",
+        client_id: "user_123",
+        status: "New",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000 * 10).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_107",
+                request_id: "REQ-2026-006",
+                item_number: 1,
+                categories: ["Text", "Image"],
+                description: "Build Gala Landing Page.",
+                page_url: "https://www.school.edu/gala",
+                details: { original_text: "N/A", updated_text: "Content pending from Marketing team." },
+                status: "New",
+                assigned_to: null,
+                reviewer_id: null,
+                peer_reviewers: [],
+                estimated_effort: 0,
+                due_date: null,
+                created_at: new Date(Date.now() - 3600000 * 5).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_10", request_id: "REQ-2026-006", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 3600000 * 5).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-007",
+        title: "Footer Link 404 Error",
+        description: "The 'Privacy Policy' link in the footer is returning a 404 error.",
+        page_url: "https://www.school.edu/",
+        client_id: "user_123",
+        status: "New",
+        urgency: "Urgent",
+        created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_108",
+                request_id: "REQ-2026-007",
+                item_number: 1,
+                categories: ["Defect"],
+                description: "Fix broken Privacy Policy link.",
+                page_url: "https://www.school.edu/",
+                details: {},
+                status: "New",
+                assigned_to: null,
+                reviewer_id: null,
+                peer_reviewers: [],
+                estimated_effort: 0,
+                due_date: null,
+                created_at: new Date(Date.now() - 3600000 * 1).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_11", request_id: "REQ-2026-007", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 3600000 * 1).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-008",
+        title: "Staff Directory Update: Mrs. Davis",
+        description: "Mrs. Davis has moved to the English department. Please update her profile.",
+        page_url: "https://www.school.edu/staff",
+        client_id: "user_123",
+        status: "In Progress",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_109",
+                request_id: "REQ-2026-008",
+                item_number: 1,
+                categories: ["Text"],
+                description: "Update department for Mrs. Davis.",
+                page_url: "https://www.school.edu/staff/davis",
                 details: {},
                 status: "In Progress",
-                assigned_to: "developer1@dummy.com",
-                reviewer_id: "dev-1", // Assigned to Developer 1
-                estimated_effort: 4,
-                due_date: new Date(Date.now() + 172800000).toISOString(),
+                assigned_to: "dev_3",
+                reviewer_id: "rev_2",
                 peer_reviewers: [],
-                created_at: new Date(Date.now() - 43200000).toISOString()
+                estimated_effort: 0.5,
+                due_date: new Date(Date.now() + 86400000).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 3).toISOString()
             }
+        ],
+        audit_logs: [
+            { id: "log_12", request_id: "REQ-2026-008", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 3).toISOString() },
+            { id: "log_13", request_id: "REQ-2026-008", user_id: "admin@dummy.com", user_email: "admin@dummy.com", action: "Updated Status to In Progress", created_at: new Date(Date.now() - 86400000 * 1).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-009",
+        title: "Math Dept Curriculum PDF",
+        description: "Upload the new 2026 Math Curriculum PDF.",
+        page_url: "https://www.school.edu/academics/math",
+        client_id: "user_123",
+        status: "Complete",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 8).toISOString(),
+        start_date: new Date(Date.now() - 86400000 * 7).toISOString(),
+        sla_due_date: new Date(Date.now() - 86400000 * 4).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_110",
+                request_id: "REQ-2026-009",
+                item_number: 1,
+                categories: ["Document"],
+                description: "Upload Math_Curriculum_2026.pdf",
+                page_url: "https://www.school.edu/academics/math",
+                details: {},
+                status: "Complete",
+                assigned_to: "dev_2",
+                reviewer_id: "rev_1",
+                peer_reviewers: [],
+                estimated_effort: 0.5,
+                due_date: new Date(Date.now() - 86400000 * 5).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 8).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_20", request_id: "REQ-2026-009", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 8).toISOString() },
+            { id: "log_21", request_id: "REQ-2026-009", user_id: "admin@dummy.com", user_email: "admin@dummy.com", action: "Updated Status to Complete", created_at: new Date(Date.now() - 86400000 * 5).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-010",
+        title: "Homepage Carousel Stutter",
+        description: "The image carousel on the homepage stutters when sliding on Firefox.",
+        page_url: "https://www.school.edu/",
+        client_id: "user_123",
+        status: "Peer Review",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_111",
+                request_id: "REQ-2026-010",
+                item_number: 1,
+                categories: ["Defect"],
+                description: "Optimize carousel animation loop for Firefox.",
+                page_url: "https://www.school.edu/",
+                details: {},
+                status: "Peer Review",
+                assigned_to: "dev_1",
+                reviewer_id: "rev_1",
+                peer_reviewers: [],
+                estimated_effort: 2,
+                due_date: new Date(Date.now() + 3600000).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 4).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_14", request_id: "REQ-2026-010", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 4).toISOString() },
+            { id: "log_15", request_id: "REQ-2026-010", user_id: "dev_1", user_email: "developer1@dummy.com", action: "Updated Status to Peer Review", created_at: new Date(Date.now() - 86400000 * 1).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-011",
+        title: "New Blog Post: STEM Awards",
+        description: "Post the news about our robotics team winning state.",
+        page_url: "https://www.school.edu/news",
+        client_id: "user_123",
+        status: "Info Needed",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000 * 4).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_112",
+                request_id: "REQ-2026-011",
+                item_number: 1,
+                categories: ["Text", "Image"],
+                description: "Create blog post 'Robotics Team Wins State'.",
+                page_url: "https://www.school.edu/news",
+                details: {},
+                status: "Info Needed",
+                assigned_to: "dev_2",
+                reviewer_id: null,
+                peer_reviewers: [],
+                estimated_effort: 1,
+                due_date: null,
+                created_at: new Date(Date.now() - 86400000 * 1).toISOString()
+            }
+        ],
+        messages: [
+            { id: "m_11", request_id: "REQ-2026-011", user_id: "dev_2", is_internal: false, text: "Can you provide the high-res photo of the team holdign the trophy?", created_at: new Date().toISOString(), profiles: { email: "developer2@dummy.com", role: "developer" } }
+        ],
+        audit_logs: [
+            { id: "log_16", request_id: "REQ-2026-011", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 1).toISOString() },
+            { id: "log_17", request_id: "REQ-2026-011", user_id: "dev_2", user_email: "developer2@dummy.com", action: "Updated Status to Info Needed", created_at: new Date().toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-012",
+        title: "Sports Schedule Fall 2026",
+        description: "Upload the preliminary Fall 2026 sports schedule to the athletics page.",
+        page_url: "https://www.school.edu/athletics",
+        client_id: "user_123",
+        status: "New",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 7200000).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_113",
+                request_id: "REQ-2026-012",
+                item_number: 1,
+                categories: ["Text"],
+                description: "Update athletics calendar component.",
+                page_url: "https://www.school.edu/athletics",
+                details: {},
+                status: "New",
+                assigned_to: null,
+                reviewer_id: null,
+                peer_reviewers: [],
+                estimated_effort: 0,
+                due_date: null,
+                created_at: new Date(Date.now() - 7200000).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_18", request_id: "REQ-2026-012", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 7200000).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-013",
+        title: "Privacy Policy Update",
+        description: "Legal has sent new terms for the Privacy Policy. Needs immediate update.",
+        page_url: "https://www.school.edu/privacy",
+        client_id: "user_123",
+        status: "In Progress",
+        urgency: "Urgent",
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        sla_due_date: new Date(Date.now() + 3600000 * 12).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_114",
+                request_id: "REQ-2026-013",
+                item_number: 1,
+                categories: ["Text"],
+                description: "Replace entire Privacy Policy text.",
+                page_url: "https://www.school.edu/privacy",
+                details: { updated_text: "Attached in email..." },
+                status: "In Progress",
+                assigned_to: "dev_3",
+                reviewer_id: "rev_2",
+                peer_reviewers: [],
+                estimated_effort: 0.5,
+                due_date: new Date(Date.now() + 3600000 * 6).toISOString(),
+                created_at: new Date(Date.now() - 86400000).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_19", request_id: "REQ-2026-013", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000).toISOString() },
+            { id: "log_20_1", request_id: "REQ-2026-013", user_id: "dev_3", user_email: "developer3@dummy.com", action: "Updated Status to In Progress", created_at: new Date(Date.now() - 43200000).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-014",
+        title: "Gallery: Art Fair 2025",
+        description: "Create a photo gallery for the recent Art Fair.",
+        page_url: "https://www.school.edu/arts/gallery",
+        client_id: "user_123",
+        status: "Complete",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 86400000 * 6).toISOString(),
+        sla_due_date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_115",
+                request_id: "REQ-2026-014",
+                item_number: 1,
+                categories: ["Image"],
+                description: "Upload 20+ images to new gallery album.",
+                page_url: "https://www.school.edu/arts/gallery",
+                details: {},
+                status: "Complete",
+                assigned_to: "dev_1",
+                reviewer_id: "rev_1",
+                peer_reviewers: [],
+                estimated_effort: 3,
+                due_date: new Date(Date.now() - 86400000 * 3).toISOString(),
+                created_at: new Date(Date.now() - 86400000 * 6).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_22", request_id: "REQ-2026-014", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 86400000 * 6).toISOString() },
+            { id: "log_23", request_id: "REQ-2026-014", user_id: "dev_1", user_email: "developer1@dummy.com", action: "Updated Status to Complete", created_at: new Date(Date.now() - 86400000 * 3).toISOString() }
+        ]
+    },
+    {
+        id: "REQ-2026-015",
+        title: "Contact Form Typo",
+        description: "The word 'address' is misspelled on the contact form label.",
+        page_url: "https://www.school.edu/contact",
+        client_id: "user_123",
+        status: "New",
+        urgency: "Normal",
+        created_at: new Date(Date.now() - 1800000).toISOString(),
+        sla_due_date: new Date(Date.now() + 86400000 * 3).toISOString(),
+        profiles: { email: "client@school.edu", school: "Saint Mary's Academy", role: "Client" },
+        items: [
+            {
+                id: "itm_116",
+                request_id: "REQ-2026-015",
+                item_number: 1,
+                categories: ["Text", "Defect"],
+                description: "Fix label typo: 'Adress' -> 'Address'.",
+                page_url: "https://www.school.edu/contact",
+                details: {},
+                status: "New",
+                assigned_to: null,
+                reviewer_id: null,
+                peer_reviewers: [],
+                estimated_effort: 0,
+                due_date: null,
+                created_at: new Date(Date.now() - 1800000).toISOString()
+            }
+        ],
+        audit_logs: [
+            { id: "log_24", request_id: "REQ-2026-015", user_id: "client@school.edu", user_email: "client@school.edu", action: "Created Request", created_at: new Date(Date.now() - 1800000).toISOString() }
         ]
     }
 ];
-
 // Initial dummy messages
 const initialMessages: Message[] = [
     {
@@ -327,7 +779,7 @@ export async function getRequestById(id: string, currentUserId?: string, userRol
     } as Request;
 }
 
-export async function createRequest(title: string, urgency: string, userId: string, items: { categories: string[], description: string, pageUrl: string, details?: any }[]) {
+export async function createRequest(title: string, description: string, pageUrl: string, urgency: string, userId: string, items: { categories: string[], description: string, pageUrl: string, details?: any }[]) {
     const requests = getStored<Request[]>(REQUESTS_KEY, initialRequests);
 
     if (urgency === 'Urgent') {
@@ -338,6 +790,8 @@ export async function createRequest(title: string, urgency: string, userId: stri
     const newRequest: Request = {
         id: requestId,
         title,
+        description,
+        page_url: pageUrl,
         urgency,
         client_id: userId,
         status: 'New', // Ticket overall status (could be computed)

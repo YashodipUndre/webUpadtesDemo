@@ -16,7 +16,7 @@ export function ProtectedRoute({ children, allow }: ProtectedRouteProps) {
     useEffect(() => {
         const timer = setTimeout(() => {
             if (!isLoading && !role) {
-                router.push("/login");
+                router.push("/");
             }
         }, 2000);
         return () => clearTimeout(timer);

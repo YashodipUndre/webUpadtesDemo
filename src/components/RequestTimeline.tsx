@@ -9,6 +9,16 @@ export function RequestTimeline({ request }: RequestTimelineProps) {
     const milestones = React.useMemo(() => {
         const events: { label: string; date: string; isComplete: boolean }[] = [];
 
+        // Override for completed tickets to show specific sequence
+        if (request.status === 'Complete' || request.status === 'Completed') {
+            return [
+                { label: 'Created', date: request.created_at, isComplete: true },
+                { label: 'In Progress', date: request.created_at, isComplete: true },
+                { label: 'Info Needed', date: request.created_at, isComplete: true },
+                { label: 'Completed', date: request.created_at, isComplete: true }
+            ];
+        }
+
         // Always start with Created
         events.push({
             label: 'Created',
@@ -42,7 +52,7 @@ export function RequestTimeline({ request }: RequestTimelineProps) {
     const displayEvents = milestones.slice(-4);
 
     return (
-        <div className="flex items-center w-full max-w-xl mx-auto px-4 h-full">
+        <div className="flex items-center w-full max-w-xl justify-start px-4 h-full">
             {displayEvents.map((event, idx) => {
                 const isFirst = idx === 0;
                 const isLast = idx === displayEvents.length - 1;

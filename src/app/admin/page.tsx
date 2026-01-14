@@ -7,6 +7,12 @@ import { getRequests, updateRequestStatus, Request, getReviewers, assignRequest,
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth-context";
 import { BarChart3, Activity, AlertCircle, Clock, CheckCircle2, Eye } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 
 
@@ -172,27 +178,30 @@ function AdminDashboard() {
                     <h1 className="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-500 to-amber-600">Admin Console</h1>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <Link
-                        href="/admin/reports"
-                        className="px-5 py-2 bg-white text-slate-800 rounded-xl hover:bg-slate-50 border border-slate-200 transition-all font-bold text-xs shadow-sm active:scale-95 flex items-center gap-2"
+                    <Button
+                        variant="outline"
+                        asChild
+                        className="px-5 py-2 bg-white text-slate-800 rounded-xl hover:bg-slate-50 border-slate-200 font-bold text-xs shadow-sm active:scale-95 flex items-center gap-2 h-auto"
                     >
-                        <BarChart3 className="w-4 h-4 text-yellow-500" />
-                        View Analytics
-                    </Link>
-                    <button
+                        <Link href="/admin/reports">
+                            <BarChart3 className="w-4 h-4 text-yellow-500" />
+                            View Analytics
+                        </Link>
+                    </Button>
+                    <Button
                         onClick={() => handleBulkAction('Peer Review')}
                         disabled={selected.size === 0 || isLoading}
-                        className="px-5 py-2 bg-amber-500 text-stone-900 rounded-xl hover:bg-amber-600 disabled:opacity-40 transition-all shadow-md shadow-amber-100 font-bold text-xs active:scale-95"
+                        className="px-5 py-2 bg-amber-500 text-stone-900 rounded-xl hover:bg-amber-600 disabled:opacity-40 shadow-md shadow-amber-100 font-bold text-xs active:scale-95 h-auto"
                     >
                         Send to Review
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={() => handleBulkAction('Complete')}
                         disabled={selected.size === 0 || isLoading}
-                        className="px-5 py-2 bg-stone-900 text-white rounded-xl hover:bg-stone-800 disabled:opacity-40 transition-all shadow-md shadow-stone-200 font-bold text-xs active:scale-95"
+                        className="px-5 py-2 bg-stone-900 text-white rounded-xl hover:bg-stone-800 disabled:opacity-40 shadow-md shadow-stone-200 font-bold text-xs active:scale-95 h-auto"
                     >
                         Bulk Complete
-                    </button>
+                    </Button>
                 </div>
             </header>
 
@@ -239,92 +248,115 @@ function AdminDashboard() {
                 <section className="lg:col-span-4 bg-white/50 backdrop-blur-sm p-5 rounded-3xl border border-slate-200/60 flex flex-wrap items-center gap-4">
                     <div className="flex-1 min-w-[140px]">
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block ml-1 tracking-widest">School</label>
-                        <select
+                        <Select
                             value={filters.school}
-                            onChange={(e) => setFilters({ ...filters, school: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-2 focus:ring-yellow-500/10 focus:border-yellow-500 transition-all cursor-pointer appearance-none shadow-sm"
+                            onValueChange={(val) => setFilters({ ...filters, school: val })}
                         >
-                            <option value="All">All Schools</option>
-                            {uniqueSchools.map(school => (
-                                <option key={school} value={school!}>{school}</option>
-                            ))}
-                        </select>
+                            <SelectTrigger className="w-full bg-white border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-yellow-500/10 focus:border-yellow-500 shadow-sm h-auto">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Schools</SelectItem>
+                                {uniqueSchools.map(school => (
+                                    <SelectItem key={school} value={school!}>{school}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex-1 min-w-[140px]">
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block ml-1 tracking-widest">Category</label>
-                        <select
+                        <Select
                             value={filters.category}
-                            onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-2 focus:ring-yellow-500/10 focus:border-yellow-500 transition-all cursor-pointer appearance-none shadow-sm"
+                            onValueChange={(val) => setFilters({ ...filters, category: val })}
                         >
-                            <option value="All">All Categories</option>
-                            {categories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                        </select>
+                            <SelectTrigger className="w-full bg-white border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-yellow-500/10 focus:border-yellow-500 shadow-sm h-auto">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Categories</SelectItem>
+                                {categories.map(cat => (
+                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex-1 min-w-[140px]">
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block ml-1 tracking-widest">Status</label>
-                        <select
+                        <Select
                             value={filters.status}
-                            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-2 focus:ring-yellow-500/10 focus:border-yellow-500 transition-all cursor-pointer appearance-none shadow-sm"
+                            onValueChange={(val) => setFilters({ ...filters, status: val })}
                         >
-                            <option value="All">All Statuses</option>
-                            <option>New</option>
-                            <option>In Progress</option>
-                            <option>Info Needed</option>
-                            <option>Peer Review</option>
-                            <option>Complete</option>
-                        </select>
+                            <SelectTrigger className="w-full bg-white border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-yellow-500/10 focus:border-yellow-500 shadow-sm h-auto">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Statuses</SelectItem>
+                                <SelectItem value="New">New</SelectItem>
+                                <SelectItem value="In Progress">In Progress</SelectItem>
+                                <SelectItem value="Info Needed">Info Needed</SelectItem>
+                                <SelectItem value="Peer Review">Peer Review</SelectItem>
+                                <SelectItem value="Complete">Complete</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex-1 min-w-[140px]">
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block ml-1 tracking-widest">Urgency</label>
-                        <select
+                        <Select
                             value={filters.urgency}
-                            onChange={(e) => setFilters({ ...filters, urgency: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-2 focus:ring-yellow-500/10 focus:border-yellow-500 transition-all cursor-pointer appearance-none shadow-sm"
+                            onValueChange={(val) => setFilters({ ...filters, urgency: val })}
                         >
-                            <option value="All">Any Priority</option>
-                            <option>Normal</option>
-                            <option>Urgent</option>
-                        </select>
+                            <SelectTrigger className="w-full bg-white border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-yellow-500/10 focus:border-yellow-500 shadow-sm h-auto">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">Any Priority</SelectItem>
+                                <SelectItem value="Normal">Normal</SelectItem>
+                                <SelectItem value="Urgent">Urgent</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex-1 min-w-[140px]">
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block ml-1 tracking-widest">State</label>
-                        <select
+                        <Select
                             value={filters.active}
-                            onChange={(e) => setFilters({ ...filters, active: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-2 focus:ring-yellow-500/10 focus:border-yellow-500 transition-all cursor-pointer appearance-none shadow-sm"
+                            onValueChange={(val) => setFilters({ ...filters, active: val })}
                         >
-                            <option value="All">All Items</option>
-                            <option value="Active">Active Only</option>
-                            <option value="Completed">Completed Only</option>
-                        </select>
+                            <SelectTrigger className="w-full bg-white border-slate-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-yellow-500/10 focus:border-yellow-500 shadow-sm h-auto">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Items</SelectItem>
+                                <SelectItem value="Active">Active Only</SelectItem>
+                                <SelectItem value="Completed">Completed Only</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </section>
 
                 <section className="bg-yellow-50/50 p-5 rounded-3xl border border-yellow-100 flex flex-col justify-center">
                     <label className="text-[10px] font-black uppercase text-yellow-600 mb-2 ml-1 tracking-widest">Mass Action</label>
                     <div className="flex gap-2">
-                        <select
+                        <Select
                             value={massReviewerId}
-                            onChange={(e) => setMassReviewerId(e.target.value)}
+                            onValueChange={setMassReviewerId}
                             disabled={selected.size === 0}
-                            className="flex-1 bg-white border border-yellow-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-2 focus:ring-yellow-400/10 outline-none disabled:opacity-50 appearance-none shadow-sm"
                         >
-                            <option value="">Assign To...</option>
-                            {reviewers.map(rev => (
-                                <option key={rev.id} value={rev.id}>{rev.email.split('@')[0]}</option>
-                            ))}
-                        </select>
-                        <button
+                            <SelectTrigger className="flex-1 bg-white border-yellow-200 rounded-xl text-xs font-bold px-3 py-2 text-slate-700 focus:ring-yellow-400/10 h-auto">
+                                <SelectValue placeholder="Assign To..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {reviewers.map(rev => (
+                                    <SelectItem key={rev.id} value={rev.id}>{rev.email.split('@')[0]}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button
                             onClick={handleMassAssign}
                             disabled={selected.size === 0 || !massReviewerId}
-                            className="bg-yellow-400 text-stone-900 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-yellow-500 disabled:opacity-50 transition-all active:scale-95 shadow-md shadow-yellow-100"
+                            className="bg-yellow-400 text-stone-900 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-yellow-500 disabled:opacity-50 transition-all active:scale-95 shadow-md shadow-yellow-100 h-auto"
                         >
                             Go
-                        </button>
+                        </Button>
                     </div>
                 </section>
             </div>
@@ -337,37 +369,36 @@ function AdminDashboard() {
                 )
             }
 
-            <div className="card-premium overflow-hidden bg-white rounded-[2.5rem] border-slate-200 shadow-xl shadow-slate-200/50">
+            <Card className="overflow-hidden bg-white rounded-[2.5rem] border-slate-200 shadow-xl shadow-slate-200/50 p-0">
                 <div className="overflow-x-auto h-[400px] overflow-y-auto scrollbar-hide">
-                    <table className="w-full table-auto min-w-[900px]">
-                        <thead>
-                            <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
-                                <th className="px-6 py-5">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400"
-                                        onChange={(e) => {
-                                            if (e.target.checked) setSelected(new Set(visible.map(v => v.id)));
+                    <Table className="min-w-[900px]">
+                        <TableHeader>
+                            <TableRow className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 hover:bg-transparent">
+                                <TableHead className="px-6 py-5">
+                                    <Checkbox
+                                        checked={selected.size > 0 && selected.size === visible.length}
+                                        onCheckedChange={(checked) => {
+                                            if (checked) setSelected(new Set(visible.map(v => v.id)));
                                             else setSelected(new Set());
                                         }}
-                                        checked={selected.size > 0 && selected.size === visible.length}
+                                        className="border-slate-300 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-white focus:ring-yellow-400"
                                     />
-                                </th>
-                                <th className="px-6 py-5">Request</th>
-                                <th className="px-6 py-5">Client</th>
-                                <th className="px-6 py-5">Status</th>
-                                <th className="px-6 py-5">Priority</th>
-                                <th className="px-6 py-5">SLA Status</th>
-                                <th className="px-6 py-5 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
+                                </TableHead>
+                                <TableHead className="px-6 py-5">Request</TableHead>
+                                <TableHead className="px-6 py-5">Client</TableHead>
+                                <TableHead className="px-6 py-5">Status</TableHead>
+                                <TableHead className="px-6 py-5">Priority</TableHead>
+                                <TableHead className="px-6 py-5">SLA Status</TableHead>
+                                <TableHead className="px-6 py-5 text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y divide-slate-50">
                             {visible.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-6 py-16 text-center text-slate-400 font-bold italic text-sm">
+                                <TableRow>
+                                    <TableCell colSpan={8} className="px-6 py-16 text-center text-slate-400 font-bold italic text-sm">
                                         No matching operational requests identified.
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             ) : (
                                 visible.map((r) => {
                                     const getSLAStatus = (slaDate: string | null, status: string) => {
@@ -386,23 +417,22 @@ function AdminDashboard() {
                                     const sla = getSLAStatus(r.sla_due_date, r.status);
 
                                     return (
-                                        <tr
+                                        <TableRow
                                             key={r.id}
                                             className={`hover:bg-slate-50/80 transition-all group ${r.urgency === "Urgent" ? "bg-red-50/30" : ""}`}
                                         >
-                                            <td className="px-6 py-5">
-                                                <input
-                                                    type="checkbox"
-                                                    className="w-4 h-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400"
+                                            <TableCell className="px-6 py-5">
+                                                <Checkbox
                                                     checked={selected.has(r.id)}
-                                                    onChange={() => toggle(r.id)}
+                                                    onCheckedChange={() => toggle(r.id)}
+                                                    className="border-slate-300 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-white focus:ring-yellow-400"
                                                 />
-                                            </td>
-                                            <td className="px-6 py-5">
+                                            </TableCell>
+                                            <TableCell className="px-6 py-5">
                                                 <div className="flex items-center gap-4">
                                                     <div>
                                                         <p className="font-bold text-slate-800 text-sm group-hover:text-yellow-600 transition-colors">{r.title}</p>
-                                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Ref: {r.id.slice(0, 8)}</p>
+                                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Ref: {r.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 10000}</p>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 ml-auto">
                                                         <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[10px] font-black text-slate-400">
@@ -418,43 +448,46 @@ function AdminDashboard() {
                                                         )}
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-5">
+                                            </TableCell>
+                                            <TableCell className="px-6 py-5">
                                                 <p className="text-sm font-bold text-slate-500">{r.profiles?.email.split('@')[0]}</p>
                                                 <p className="text-[10px] text-slate-400 font-medium">{r.profiles?.email}</p>
-                                            </td>
-                                            <td className="px-6 py-5">
+                                            </TableCell>
+                                            <TableCell className="px-6 py-5">
                                                 <StatusBadge status={r.status} />
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${r.urgency === "Urgent"
-                                                    ? "bg-rose-50 text-rose-600 border-rose-100"
-                                                    : "bg-slate-50 text-slate-400 border-slate-100"
-                                                    }`}>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-5">
+                                                <Badge
+                                                    variant={r.urgency === "Urgent" ? "destructive" : "secondary"}
+                                                    className="uppercase tracking-widest text-[10px] font-black"
+                                                >
                                                     {r.urgency}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border inline-block whitespace-nowrap ${sla.color}`}>
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-5">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`text-[10px] font-black uppercase tracking-widest inline-block whitespace-nowrap ${sla.color}`}
+                                                >
                                                     {sla.label}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-5 text-right">
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-5 text-right">
                                                 <Link
                                                     href={`/admin/requests/${r.id}`}
                                                     className="inline-flex items-center justify-center text-slate-300 hover:text-yellow-600 transition-colors"
                                                 >
                                                     <Eye className="w-5 h-5 hover:scale-110 transition-transform" />
                                                 </Link>
-                                            </td>
-                                        </tr>
+                                            </TableCell>
+                                        </TableRow>
                                     );
                                 })
                             )}
-                        </tbody>
-                    </table>
+                        </TableBody>
+                    </Table>
                 </div>
-            </div>
+            </Card>
             {/* Pagination Controls */}
 
         </div>

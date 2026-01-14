@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const logout = async () => {
         localStorage.removeItem(SESSION_KEY);
         setUser(null);
-        router.push("/login");
+        router.push("/");
     };
 
     const refreshRole = async () => {

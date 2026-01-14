@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -10,7 +11,7 @@ export function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const navLinks = [
-        { href: "/", label: "Dashboard", show: role === "client" },
+        { href: "/client", label: "Dashboard", show: role === "client" },
         { href: "/requests/new", label: "New Ticket", show: role === "client" },
         { href: "/admin", label: "Overview", show: role === "admin" },
         { href: "/admin/reports", label: "Reports", show: role === "admin" },
@@ -34,24 +35,21 @@ export function Navbar() {
 
                         <div className="hidden md:ml-10 md:flex md:space-x-1">
                             {navLinks.map((link) => (
-                                <Link
+                                <Button
                                     key={link.href}
-                                    href={link.href}
-                                    className="px-3.5 py-2 text-sm font-bold text-slate-500 hover:text-yellow-600 hover:bg-yellow-50/50 rounded-lg transition-all"
+                                    asChild
+                                    variant="ghost"
+                                    className="text-sm font-bold text-slate-500 hover:text-yellow-600 hover:bg-yellow-50/50"
                                 >
-                                    {link.label}
-                                </Link>
+                                    <Link href={link.href}>
+                                        {link.label}
+                                    </Link>
+                                </Button>
                             ))}
                         </div>
                     </div>
 
                     <div className="hidden md:flex items-center gap-5">
-                        {!user && (
-                            <div className="flex items-center gap-5">
-                                <Link href="/login" className="text-sm font-bold text-slate-600 hover:text-yellow-600 transition-colors">Sign In</Link>
-                                <Link href="/signup" className="px-6 py-2.5 text-sm font-bold text-stone-900 bg-yellow-400 rounded-xl hover:bg-yellow-500 transition-all shadow-lg shadow-yellow-100 active:scale-95">Get Started</Link>
-                            </div>
-                        )}
                     </div>
 
                     <div className="flex md:hidden items-center">
@@ -81,34 +79,19 @@ export function Navbar() {
                     >
                         <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                             {navLinks.map((link) => (
-                                <Link
+                                <Button
                                     key={link.href}
-                                    href={link.href}
+                                    asChild
+                                    variant="ghost"
+                                    className="w-full justify-start text-base font-medium text-slate-600 hover:bg-yellow-50 hover:text-yellow-600"
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className="block px-3 py-2 text-base font-medium text-slate-600 hover:bg-yellow-50 hover:text-yellow-600 rounded-md"
                                 >
-                                    {link.label}
-                                </Link>
+                                    <Link href={link.href}>
+                                        {link.label}
+                                    </Link>
+                                </Button>
                             ))}
                             <div className="pt-4 pb-3 border-t border-slate-100">
-                                {!user && (
-                                    <div className="px-3 space-y-1">
-                                        <Link
-                                            href="/login"
-                                            onClick={() => setMobileMenuOpen(false)}
-                                            className="block px-3 py-2 text-base font-medium text-slate-600 hover:bg-slate-50 rounded-md"
-                                        >
-                                            Sign In
-                                        </Link>
-                                        <Link
-                                            href="/signup"
-                                            onClick={() => setMobileMenuOpen(false)}
-                                            className="block px-3 py-2 text-base font-medium text-yellow-600 hover:bg-yellow-50 rounded-md"
-                                        >
-                                            Sign Up
-                                        </Link>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </motion.div>

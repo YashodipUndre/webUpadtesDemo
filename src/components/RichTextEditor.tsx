@@ -93,11 +93,6 @@ export function RichTextEditor({ value, onChange, placeholder, className, leadin
                     <ToolbarButton icon={Link} onClick={() => { const url = prompt("Enter URL:"); if (url) execCommand("createLink", url); }} title="Link" />
                     <ToolbarButton icon={List} active={activeStates.list} onClick={() => execCommand("insertUnorderedList")} title="Bullet List" />
                     <ToolbarButton icon={ListOrdered} active={activeStates.orderedList} onClick={() => execCommand("insertOrderedList")} title="Ordered List" />
-
-                    <div className="w-px h-4 bg-slate-300 mx-1" />
-
-                    <ToolbarButton icon={Code} active={activeStates.code} onClick={() => execCommand("formatBlock", "pre")} title="Code Block" />
-                    <ToolbarButton icon={Quote} active={activeStates.quote} onClick={() => execCommand("formatBlock", "blockquote")} title="Quote" />
                 </div>
             )}
 
@@ -139,13 +134,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, leadin
                         <Smile className="w-5 h-5" />
                     </button>
 
-                    <button
-                        onClick={() => insertText("@")}
-                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors"
-                        title="Mention"
-                    >
-                        <AtSign className="w-5 h-5" />
-                    </button>
+
                 </div>
 
                 {/* Trailing Actions (Send Button) */}

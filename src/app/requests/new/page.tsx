@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { createRequest, DYNAMIC_CATEGORIES, CategoryType } from "@/lib/data";
 import { useAuth } from "@/lib/auth-context";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, Trash2, Loader2, Check } from "lucide-react";
 
 export default function NewRequestPage() {
     return (
@@ -15,23 +21,44 @@ export default function NewRequestPage() {
 }
 
 interface RequestItemForm {
-    category: CategoryType;
+    categories: CategoryType[];
     dynamicValues: Record<string, string>;
+    title?: string;
+    description?: string;
+    pageUrl?: string;
 }
 
 function NewRequestForm() {
     const router = useRouter();
     const { user } = useAuth();
     const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    const [globalUrl, setGlobalUrl] = useState("");
     const [urgency, setUrgency] = useState("Normal");
     const [items, setItems] = useState<RequestItemForm[]>([
-        { category: "Text", dynamicValues: {} }
+        { categories: ["Text"], dynamicValues: {}, title: "", pageUrl: "" }
     ]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const addItem = () => {
-        setItems([...items, { category: "Text", dynamicValues: {} }]);
+        const lastItem = items[items.length - 1];
+        if (lastItem) {
+            // Check fields from ALL selected categories
+            let allMissing: any[] = [];
+            lastItem.categories.forEach(cat => {
+                const catFields = DYNAMIC_CATEGORIES.find(c => c.id === cat)?.fields || [];
+                const missing = catFields.filter(f => f.required && !lastItem.dynamicValues[f.id]);
+                if (missing.length > 0) allMissing = [...allMissing, ...missing];
+            });
+
+            if (allMissing.length > 0) {
+                setError(`Please complete the current item before adding a new one. Missing: ${allMissing.map(f => f.label).join(", ")}`);
+                return;
+            }
+        }
+        setError(null);
+        setItems([...items, { categories: ["Text"], dynamicValues: {}, title: "", pageUrl: "" }]);
     };
 
     const removeItem = (index: number) => {
@@ -46,9 +73,7 @@ function NewRequestForm() {
         setItems(newItems);
     };
 
-    const setCategory = (index: number, category: CategoryType) => {
-        updateItem(index, { category });
-    };
+
 
     const handleFieldChange = (itemIndex: number, fieldId: string, value: string) => {
         const item = items[itemIndex];
@@ -58,22 +83,34 @@ function NewRequestForm() {
 
     async function submit() {
         if (!title.trim()) {
-            setError("Request title is required");
+            setError("Global Ticket Title is required");
+            return;
+        }
+
+        if (!globalUrl.trim()) {
+            setError("Global URL is required");
             return;
         }
 
         // Validate all items
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            // Merge fields from all selected categories
-            const allFields = DYNAMIC_CATEGORIES.find(c => c.id === item.category)?.fields || [];
 
-            // Deduplicate fields by ID
-            const uniqueFields = Array.from(new Map(allFields.map(f => [f.id, f])).values());
+            // Check required fields from ALL selected categories
+            let allMissing: any[] = [];
+            item.categories.forEach(cat => {
+                const catFields = DYNAMIC_CATEGORIES.find(c => c.id === cat)?.fields || [];
+                const missing = catFields.filter(f => f.required && !item.dynamicValues[f.id]);
+                if (missing.length > 0) allMissing = [...allMissing, ...missing];
+            });
 
-            const missing = uniqueFields.filter(f => f.required && !item.dynamicValues[f.id]);
-            if (missing && missing.length > 0) {
-                setError(`Item #${i + 1}: Please fill in required fields: ${missing.map(f => f.label).join(", ")}`);
+            if (!item.title?.trim()) {
+                setError(`Item #${i + 1}: Item Title is required`);
+                return;
+            }
+
+            if (allMissing.length > 0) {
+                setError(`Item #${i + 1}: Please fill in required fields: ${allMissing.map(f => f.label).join(", ")}`);
                 return;
             }
         }
@@ -85,14 +122,14 @@ function NewRequestForm() {
 
         try {
             const formattedItems = items.map(it => ({
-                categories: [it.category],
-                description: it.dynamicValues.description || it.dynamicValues.original_text || title,
-                pageUrl: it.dynamicValues.page_url || "",
-                details: it.dynamicValues
+                categories: it.categories,
+                description: it.description || "",
+                pageUrl: it.pageUrl || globalUrl || "",
+                details: { ...it.dynamicValues, item_title: it.title }
             }));
 
-            await createRequest(title, urgency, user.id, formattedItems);
-            router.push("/");
+            await createRequest(title, description, globalUrl, urgency, user.id, formattedItems);
+            router.push("/client");
         } catch (err: any) {
             setError(err.message);
             setIsSubmitting(false);
@@ -101,11 +138,10 @@ function NewRequestForm() {
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto py-6 px-4">
+            {/* Header */}
             <div className="flex items-center gap-3 mb-1">
-                <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center shadow-lg shadow-yellow-100">
-                    <svg className="w-5 h-5 text-stone-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                    </svg>
+                <div className="w-10 h-10 bg-yellow-400 rounded-md flex items-center justify-center shadow-lg shadow-yellow-100">
+                    <Plus className="w-5 h-5 text-stone-900" strokeWidth={2.5} />
                 </div>
                 <div>
                     <h1 className="text-xl font-black text-slate-900 tracking-tight">Create Multi-Item Request</h1>
@@ -113,187 +149,271 @@ function NewRequestForm() {
                 </div>
             </div>
 
-            <div className="glass p-6 md:p-8 rounded-[2rem] shadow-xl border-white/40 space-y-6">
-                {error && (
-                    <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-xs font-bold animate-in fade-in slide-in-from-top-2">
-                        {error}
-                    </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2 border-b border-slate-100">
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Global Ticket Title</label>
-                        <input
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g., Seasonal Website Refresh"
-                            className="w-full p-3 bg-white/80 border border-slate-200 rounded-xl focus:ring-4 focus:ring-yellow-400/20 focus:border-yellow-400 transition-all outline-none font-bold text-sm text-slate-700 shadow-sm"
-                        />
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Urgency Level</label>
-                        <div className="relative">
-                            <select
-                                value={urgency}
-                                onChange={(e) => setUrgency(e.target.value)}
-                                className={`w-full p-3 border rounded-xl focus:ring-4 transition-all outline-none font-black text-sm appearance-none cursor-pointer shadow-sm ${urgency === "Urgent"
-                                    ? "bg-red-50 border-red-200 text-red-600 focus:ring-red-500/10 focus:border-red-500"
-                                    : "bg-white/80 border-slate-200 text-slate-700 focus:ring-yellow-400/20 focus:border-yellow-400"
-                                    }`}
-                            >
-                                <option>Normal</option>
-                                <option>Urgent</option>
-                            </select>
-                            <div className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${urgency === "Urgent" ? "text-red-400" : "text-slate-400"}`}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
-                            </div>
+            <Card className="rounded-lg shadow-xl border-white/40 bg-white/50 backdrop-blur-sm overflow-hidden">
+                <CardContent className="p-6 md:p-8 space-y-6">
+                    {error && (
+                        <div className="bg-slate-50 border border-slate-100 text-slate-600 p-4 rounded-xl text-xs font-bold animate-in fade-in slide-in-from-top-2">
+                            {error}
                         </div>
-                    </div>
-                </div>
+                    )}
 
-                <div className="space-y-8">
-                    {items.map((item, index) => {
-                        const allFields = DYNAMIC_CATEGORIES.find(c => c.id === item.category)?.fields || [];
-                        const uniqueFields = Array.from(new Map(allFields.map(f => [f.id, f])).values());
-
-                        return (
-                            <div key={index} className="relative space-y-4 pt-4 animate-in fade-in slide-in-from-bottom-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-6 h-6 bg-stone-900 text-white rounded flex items-center justify-center font-black text-[10px]">#{index + 1}</span>
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Update Item Specification</h3>
-                                    </div>
-                                    {items.length > 1 && (
-                                        <button
-                                            onClick={() => removeItem(index)}
-                                            className="text-red-400 hover:text-red-600 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1 transition-colors"
-                                        >
-                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            Remove
-                                        </button>
-                                    )}
+                    {/* Global Settings */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
+                        <div className="space-y-4 md:col-span-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Global Ticket Title</label>
+                                    <Input
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        placeholder="e.g., Seasonal Website Refresh"
+                                        className="h-12 border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700"
+                                    />
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Update Categories</label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {DYNAMIC_CATEGORIES.filter(c => c.enabled).map(c => {
-                                            const isSelected = item.category === c.id;
+                                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Urgency Level</label>
+                                    <Select value={urgency} onValueChange={setUrgency}>
+                                        <SelectTrigger className={`h-12 rounded-md font-black text-sm border-slate-200 ${urgency === "Urgent" ? "bg-slate-900 text-white border-slate-900" : "bg-white/80 text-slate-700"}`}>
+                                            <SelectValue placeholder="Select urgency" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Normal">Normal</SelectItem>
+                                            <SelectItem value="Urgent">Urgent</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Global URL <span className="text-yellow-600">*</span></label>
+                                <Input
+                                    value={globalUrl}
+                                    onChange={(e) => setGlobalUrl(e.target.value)}
+                                    placeholder="https://myschool.com"
+                                    className="h-12 border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Global Description (Optional)</label>
+                                <Textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Provide a general overview or context for this request..."
+                                    className="min-h-[80px] border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Items List */}
+                    <div className="space-y-8">
+                        {items.map((item, index) => {
+                            // Aggregate fields from all selected categories, excluding page_url (now a common field)
+                            const allFields = item.categories.flatMap(catId =>
+                                DYNAMIC_CATEGORIES.find(c => c.id === catId)?.fields || []
+                            ).filter(f => f.id !== 'page_url');
+                            const uniqueFields = Array.from(new Map(allFields.map(f => [f.id, f])).values());
+
+                            return (
+                                <div key={index} className="relative space-y-4 pt-4 animate-in fade-in slide-in-from-bottom-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-6 h-6 bg-stone-900 text-white rounded flex items-center justify-center font-black text-[10px]">#{index + 1}</span>
+                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Update Item Specification</h3>
+                                        </div>
+                                        {items.length > 1 && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeItem(index)}
+                                                className="text-slate-400 hover:text-slate-600 hover:bg-slate-50 font-bold text-[10px] uppercase tracking-widest h-8 px-2 rounded-md"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                                Remove
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Item Title Input */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Item Title</label>
+                                        <Input
+                                            value={item.title || ""}
+                                            onChange={(e) => updateItem(index, { title: e.target.value })}
+                                            placeholder={`Item #${index + 1} Title`}
+                                            className="h-12 border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700 shadow-sm"
+                                        />
+                                    </div>
+
+                                    {/* Page URL - Common field for all categories */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Page URL (Optional)</label>
+                                        <Input
+                                            value={item.pageUrl || ""}
+                                            onChange={(e) => updateItem(index, { pageUrl: e.target.value })}
+                                            placeholder="https://school.com/specific-page (leave empty to use global URL)"
+                                            className="h-12 border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700 shadow-sm"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Description (Optional)</label>
+                                        <Textarea
+                                            value={item.description || ""}
+                                            onChange={(e) => updateItem(index, { description: e.target.value })}
+                                            placeholder="Add specific details about this item..."
+                                            className="min-h-[80px] border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700 resize-none"
+                                        />
+                                    </div>
+
+                                    {/* Category Tabs */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Update Categories</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {DYNAMIC_CATEGORIES.filter(c => c.enabled).map(c => {
+                                                const isSelected = item.categories.includes(c.id);
+                                                return (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            // Multi-select: toggle categories on/off
+                                                            let newCats;
+                                                            if (isSelected) {
+                                                                newCats = item.categories.filter(cat => cat !== c.id);
+                                                                if (newCats.length === 0) newCats = ["Text"]; // Fallback to at least one
+                                                            } else {
+                                                                newCats = [...item.categories, c.id];
+                                                            }
+                                                            updateItem(index, { categories: newCats as CategoryType[] });
+                                                        }}
+                                                        className={`px-3 py-2 rounded-md text-xs font-bold border transition-all flex items-center gap-2 ${isSelected
+                                                            ? "bg-yellow-400 border-yellow-500 text-stone-900 shadow-sm"
+                                                            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                                            }`}
+                                                    >
+                                                        {isSelected && <Check className="w-3 h-3" />}
+                                                        {c.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Fields Container - Grouped by Category */}
+                                    <div className="space-y-4">
+                                        {item.categories.map(catId => {
+                                            const category = DYNAMIC_CATEGORIES.find(c => c.id === catId);
+                                            const categoryFields = (category?.fields || []).filter(f => f.id !== 'page_url');
+
+                                            if (categoryFields.length === 0) return null;
+
                                             return (
-                                                <button
-                                                    key={c.id}
-                                                    type="button"
-                                                    onClick={() => setCategory(index, c.id)}
-                                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${isSelected
-                                                        ? "bg-yellow-400 border-yellow-500 text-stone-900 shadow-sm"
-                                                        : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-                                                        }`}
-                                                >
-                                                    {c.label}
-                                                </button>
+                                                <div key={catId} className="p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
+                                                    {/* Category Header */}
+                                                    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-200">
+                                                        <div className="w-6 h-6 bg-yellow-400 rounded flex items-center justify-center">
+                                                            <Check className="w-3 h-3 text-stone-900" />
+                                                        </div>
+                                                        <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">{category?.label}</h4>
+                                                    </div>
+
+                                                    {/* Category Fields */}
+                                                    <div className="grid grid-cols-1 gap-4">
+                                                        {categoryFields.map((field) => (
+                                                            <div key={field.id} className="space-y-1.5">
+                                                                <div className="flex justify-between items-baseline">
+                                                                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">
+                                                                        {field.label}
+                                                                    </label>
+                                                                    {field.required && <span className="text-[9px] font-bold text-yellow-600 uppercase tracking-widest">Required</span>}
+                                                                </div>
+
+                                                                {field.type === 'textarea' ? (
+                                                                    <Textarea
+                                                                        value={item.dynamicValues[field.id] || ""}
+                                                                        onChange={(e) => handleFieldChange(index, field.id, e.target.value)}
+                                                                        placeholder={field.placeholder || `Enter specific details...`}
+                                                                        className="min-h-[100px] border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700"
+                                                                    />
+                                                                ) : field.type === 'file' || field.type === 'image' ? (
+                                                                    <div className="relative group">
+                                                                        <Input
+                                                                            type="file"
+                                                                            id={`${index}-${field.id}`}
+                                                                            className="hidden"
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0];
+                                                                                if (file) handleFieldChange(index, field.id, file.name);
+                                                                            }}
+                                                                        />
+                                                                        <label
+                                                                            htmlFor={`${index}-${field.id}`}
+                                                                            className="w-full flex items-center gap-4 p-4 bg-white border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:bg-yellow-50 hover:border-yellow-400 transition-all shadow-sm"
+                                                                        >
+                                                                            <div className="w-10 h-10 bg-slate-50 rounded-md flex items-center justify-center group-hover:bg-yellow-100 transition-colors">
+                                                                                <Plus className="w-5 h-5 text-slate-400 group-hover:text-yellow-600" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-black text-slate-800">{item.dynamicValues[field.id] || `Upload ${field.label}`}</p>
+                                                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Drag & Drop or Click to Select</p>
+                                                                            </div>
+                                                                        </label>
+                                                                    </div>
+                                                                ) : (
+                                                                    <Input
+                                                                        type={field.type}
+                                                                        value={item.dynamicValues[field.id] || ""}
+                                                                        onChange={(e) => handleFieldChange(index, field.id, e.target.value)}
+                                                                        placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}...`}
+                                                                        className="h-12 border-white rounded-md focus-visible:ring-yellow-400/20 focus-visible:border-yellow-400 font-bold text-sm text-slate-700 !bg-white !text-slate-700"
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             );
                                         })}
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-1 gap-4 p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                    {uniqueFields.map((field) => (
-                                        <div key={field.id} className="space-y-1.5">
-                                            <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest flex justify-between">
-                                                {field.label}
-                                                {field.required && <span className="text-yellow-600 font-bold">REQUIRED</span>}
-                                            </label>
-
-                                            {field.type === 'textarea' ? (
-                                                <textarea
-                                                    value={item.dynamicValues[field.id] || ""}
-                                                    onChange={(e) => handleFieldChange(index, field.id, e.target.value)}
-                                                    placeholder={field.placeholder || `Enter specific details...`}
-                                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-yellow-400/20 focus:border-yellow-400 transition-all outline-none font-bold text-sm text-slate-700 shadow-sm min-h-[80px]"
-                                                />
-                                            ) : field.type === 'file' || field.type === 'image' ? (
-                                                <div className="relative group">
-                                                    <input
-                                                        type="file"
-                                                        id={`${index}-${field.id}`}
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (file) handleFieldChange(index, field.id, file.name);
-                                                        }}
-                                                    />
-                                                    <label
-                                                        htmlFor={`${index}-${field.id}`}
-                                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-yellow-50', 'border-yellow-400'); }}
-                                                        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-yellow-50', 'border-yellow-400'); }}
-                                                        onDrop={(e) => {
-                                                            e.preventDefault();
-                                                            e.currentTarget.classList.remove('bg-yellow-50', 'border-yellow-400');
-                                                            const file = e.dataTransfer.files[0];
-                                                            if (file) handleFieldChange(index, field.id, file.name);
-                                                        }}
-                                                        className="w-full flex items-center gap-4 p-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-yellow-50 hover:border-yellow-400 transition-all shadow-sm"
-                                                    >
-                                                        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-yellow-100 transition-colors">
-                                                            <svg className="w-5 h-5 text-slate-400 group-hover:text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-black text-slate-800">{item.dynamicValues[field.id] || `Upload ${field.label}`}</p>
-                                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Drag & Drop or Click to Select</p>
-                                                        </div>
-                                                    </label>
-                                                </div>
-                                            ) : (
-                                                <input
-                                                    type={field.type}
-                                                    value={item.dynamicValues[field.id] || ""}
-                                                    onChange={(e) => handleFieldChange(index, field.id, e.target.value)}
-                                                    placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}...`}
-                                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-yellow-400/20 focus:border-yellow-400 transition-all outline-none font-bold text-sm text-slate-700 shadow-sm"
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row gap-3">
-                    <button
-                        onClick={addItem}
-                        className="flex-1 p-3 bg-white border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold text-xs hover:border-yellow-400 hover:text-yellow-600 hover:bg-yellow-50 transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <svg className="w-4 h-4 group-hover:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                        Add Another Request Item
-                    </button>
-
-                    <div className="flex-[2] flex gap-3">
-                        <button
-                            onClick={submit}
-                            disabled={isSubmitting}
-                            className="flex-1 bg-yellow-400 text-stone-900 font-black px-6 py-3 rounded-xl hover:bg-yellow-500 transition-all active:scale-[0.98] shadow-lg shadow-yellow-100 flex items-center justify-center gap-2 text-sm"
-                        >
-                            {isSubmitting ? (
-                                <div className="w-5 h-5 border-3 border-stone-900/30 border-t-stone-900 rounded-full animate-spin" />
-                            ) : (
-                                <>
-                                    <span>Launch Ticket</span>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                                </>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => router.push("/")}
-                            className="bg-slate-100 text-slate-600 font-bold px-6 py-3 rounded-xl hover:bg-slate-200 transition-all active:scale-[0.98] text-sm"
-                        >
-                            Cancel
-                        </button>
+                            );
+                        })}
                     </div>
-                </div>
-            </div>
+
+                    {/* Actions */}
+                    <div className="pt-6 border-t border-slate-100 flex flex-col md:flex-row gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={addItem}
+                            className="flex-1 h-12 border-2 border-dashed border-slate-300 rounded-md text-slate-500 font-bold text-xs hover:border-yellow-400 hover:text-yellow-600 hover:bg-yellow-50"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Another Request Item
+                        </Button>
+
+                        <div className="flex-[2] flex gap-3">
+                            <Button
+                                onClick={submit}
+                                disabled={isSubmitting}
+                                className="flex-1 h-12 bg-yellow-400 text-stone-900 font-black rounded-md hover:bg-yellow-500 shadow-lg shadow-yellow-100 text-sm"
+                            >
+                                Launch Ticket
+                                <Check className="w-4 h-4 ml-2" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => router.push("/")}
+                                className="h-12 bg-slate-100 text-slate-600 font-bold rounded-md hover:bg-slate-200 text-sm"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
